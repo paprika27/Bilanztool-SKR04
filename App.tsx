@@ -13,7 +13,7 @@ const App: React.FC = () => {
   const [rawAccounts, setRawAccounts] = useState<Record<string, AccountBalance>>({});
   const [rawBookings, setRawBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'BILANZ' | 'GUV' | 'JOURNAL' | 'KONTEN'>('BILANZ');
+  const [activeTab, setActiveTab] = useState<'BILANZ' | 'GUV' | 'JOURNAL' | 'KONTEN' | 'SALDEN'>('BILANZ');
   const [selectedAccount, setSelectedAccount] = useState<AccountBalance | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [expandAll, setExpandAll] = useState(false);
@@ -176,6 +176,7 @@ const App: React.FC = () => {
             <div className="flex border-b border-gray-200 bg-white rounded-t-lg shadow-sm overflow-hidden mb-6 print:hidden">
               <TabButton id="BILANZ" icon={LayoutDashboard} label="Bilanz" />
               <TabButton id="GUV" icon={PieChart} label="GuV" />
+              <TabButton id="SALDEN" icon={FileText} label="Summe/Salden" />
               <TabButton id="KONTEN" icon={Settings} label="Kontenplan" />
               <TabButton id="JOURNAL" icon={Table} label="Journal" />
             </div>
@@ -225,6 +226,37 @@ const App: React.FC = () => {
                    />
                 </div>
               </div>
+
+              {activeTab === 'SALDEN' && (
+                <div className="p-0 overflow-auto max-h-[700px]">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-100 text-gray-700 sticky top-0 z-10 shadow-sm">
+                      <tr>
+                        <th className="p-3">Kontonummer</th>
+                        <th className="p-3">Kontoname</th>
+                        <th className="p-3 text-right">Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {Object.values(rawAccounts)
+                        .sort((a, b) => parseInt(a.accountNumber) - parseInt(b.accountNumber))
+                        .map(acc => (
+                          <tr 
+                            key={acc.accountNumber} 
+                            className="hover:bg-blue-50 cursor-pointer transition-colors"
+                            onClick={() => setSelectedAccount(acc)}
+                          >
+                            <td className="p-3 font-mono text-blue-700 font-medium">{acc.accountNumber}</td>
+                            <td className="p-3 text-gray-800">{acc.accountName}</td>
+                            <td className={`p-3 text-right font-mono ${acc.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                              {acc.balance.toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               {activeTab === 'KONTEN' && (
                 <div className="print:hidden">

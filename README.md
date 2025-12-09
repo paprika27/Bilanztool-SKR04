@@ -18,6 +18,7 @@
 ### 🎯 Core Functionality
 - **Instant Excel Import** – Upload DATEV-formatted Excel ledgers (see Hauptbuch.xlsx to get started) and get instant processing
 - **Dual Financial Views** – Interactive Bilanz (Balance Sheet) and GuV (P&L Statement) with hierarchical drilling
+- **Complete Account List** – Summe/Salden tab shows all accounts with balances and clickable details
 - **Smart Account Mapping** – Visual account assignment tool
 - **Real-time Balance Validation** – Automatic detection of discrepancies
 - **Expandable Hierarchies** – Collapse/expand any or all detail levels
@@ -77,12 +78,17 @@
 - Switch to **GuV** tab to see revenue and expense breakdown
 - Same expansion/collapse functionality for detailed drilling
 
-### Step 4: Handle Unmatched Accounts
+### Step 4: View Complete Account List
+- Switch to **Summe/Salden** tab to see all accounts with their balances in a sortable list
+- Click any account row to view its full transaction details in the side panel
+- Useful for quick account lookup and transaction analysis without the hierarchical structure
+
+### Step 5: Handle Unmatched Accounts
 - If yellow warning box appears, accounts couldn't be auto-mapped and may thus be unbalanced
 - Switch to **Kontenplan** tab to assign these accounts to proper categories or fix in your excel ledger (usually more likely)
 - Changes to mapping immediately recalculate all reports
 
-### Step 5: Export & Print
+### Step 6: Export & Print
 - Click **"Export / Druck"** to trigger browser print dialog
 - Tables automatically expand for complete PDF export
 - Optimized layout for A4 paper with sometimes proper page breaks
