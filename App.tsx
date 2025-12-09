@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, PieChart, Table, Settings, Printer, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, FileText, PieChart, Table, Settings, Printer, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import ReportTable from './components/ReportTable';
 import AccountDetails from './components/AccountDetails';
@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'BILANZ' | 'GUV' | 'JOURNAL' | 'KONTEN'>('BILANZ');
   const [selectedAccount, setSelectedAccount] = useState<AccountBalance | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [expandAll, setExpandAll] = useState(false);
   
   // State für Custom Mappings
   const [customMapping, setCustomMapping] = useState<CustomAccountMapping>({});
@@ -84,13 +85,22 @@ const App: React.FC = () => {
           </div>
           <div className="flex gap-4 items-center">
             {data && (
-              <button 
-                onClick={handlePrint}
-                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition-colors"
-              >
-                <Printer size={16} />
-                Export / Druck
-              </button>
+              <>
+                <button 
+                  onClick={() => setExpandAll(!expandAll)}
+                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition-colors"
+                >
+                  {expandAll ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  {expandAll ? 'Alle einklappen' : 'Alle ausklappen'}
+                </button>
+                <button 
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition-colors"
+                >
+                  <Printer size={16} />
+                  Export / Druck
+                </button>
+              </>
             )}
             {data && (
               <div className={`px-4 py-2 rounded-lg font-bold text-sm ${data.bilanz.check.balanced ? 'bg-green-600' : 'bg-red-600'}`}>
@@ -182,7 +192,7 @@ const App: React.FC = () => {
                       data={data.bilanz.aktiva} 
                       onSelectAccount={setSelectedAccount} 
                       root 
-                      forceExpanded={isPrinting}
+                      forceExpanded={isPrinting || expandAll}
                     />
                   </div>
                   <div className="space-y-4 print:break-before-page">
@@ -191,7 +201,7 @@ const App: React.FC = () => {
                       data={data.bilanz.passiva} 
                       onSelectAccount={setSelectedAccount} 
                       root 
-                      forceExpanded={isPrinting}
+                      forceExpanded={isPrinting || expandAll}
                     />
                   </div>
                 </div>
@@ -211,7 +221,7 @@ const App: React.FC = () => {
                     data={data.guv} 
                     onSelectAccount={setSelectedAccount} 
                     root 
-                    forceExpanded={isPrinting}
+                    forceExpanded={isPrinting || expandAll}
                    />
                 </div>
               </div>
