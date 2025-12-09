@@ -210,6 +210,42 @@ Found a bug or have a feature request? Feel free to open an issue or submit a pu
 
 ---
 
+## 📦 Packaging & Releases
+
+This repository builds desktop installers (Windows `.exe`, Linux `.deb`, macOS `.dmg`) and a Docker image via GitHub Actions. The CI workflows are defined in `.github/workflows/rust.yml` (builds the native bundles and creates the Release) and `.github/workflows/publish-ghcr.yml` (builds & pushes a Docker image to GitHub Container Registry).
+
+- **Docker (GHCR):** The Docker image is published to GHCR under your account as `ghcr.io/<owner>/bilanztool-skr04:latest` (see `publish-ghcr.yml`). To pull and run the container:
+
+```bash
+docker pull ghcr.io/paprika27/bilanztool-skr04:latest
+# Run (if the image serves the web UI on an internal port, map it; otherwise this is a generic example):
+docker run --rm -p 3000:3000 ghcr.io/paprika27/bilanztool-skr04:latest
+```
+
+- **Windows installer (.exe):** The Windows NSIS installer is produced by the `rust.yml` workflow and attached to the GitHub Release. Download the `.exe` from the Release assets and run it to install. If you prefer a portable binary, the release also contains the built executables.
+
+- **Deb package (.deb):** The Debian package is produced by the CI and attached to the Release. Install with:
+
+```bash
+sudo dpkg -i BilanzTool_SKR04_<version>_amd64.deb
+sudo apt-get install -f    # fix missing deps if necessary
+```
+
+- **macOS disk image (.dmg):** The `rust.yml` build produces a `.dmg` and attaches it to the Release. Typical install flow is to open the `.dmg` and drag the app to `/Applications`.
+
+Important note about macOS signing: I do NOT have an Apple Developer signing key configured for CI. Unsigned `.dmg`/app bundles can be blocked by Gatekeeper on newer macOS versions. If the app won't run after installation, you can temporarily bypass Gatekeeper with:
+
+```bash
+# Right-click the app and choose Open, or use:
+sudo xattr -r -d com.apple.quarantine /Applications/BilanzTool\ SKR04.app
+```
+
+If you plan to distribute to macOS users broadly, configure an Apple Developer signing identity in your repository secrets and update the CI to sign the build.
+
+### Where to get releases
+Releases are published via the `create-release` job in `.github/workflows/rust.yml`. The release assets include `*.exe`, `*.deb`, and `*.dmg` when those artifacts were built for their respective OS runners. See the latest GitHub Release for downloadable installers.
+
+
 ## 📄 License
 
 Vibe coded by Gemini 3 Pro, enhanced by Claude Haiku 4.5 (which also wrote this Readme).

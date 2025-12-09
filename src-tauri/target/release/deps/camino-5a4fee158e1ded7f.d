@@ -1,8 +1,0 @@
-C:\git\Bilanztool-SKR04\src-tauri\target\release\deps\camino-5a4fee158e1ded7f.d: C:\Users\p\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\camino-1.2.1\src\lib.rs C:\Users\p\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\camino-1.2.1\src\serde_impls.rs
-
-C:\git\Bilanztool-SKR04\src-tauri\target\release\deps\libcamino-5a4fee158e1ded7f.rlib: C:\Users\p\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\camino-1.2.1\src\lib.rs C:\Users\p\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\camino-1.2.1\src\serde_impls.rs
-
-C:\git\Bilanztool-SKR04\src-tauri\target\release\deps\libcamino-5a4fee158e1ded7f.rmeta: C:\Users\p\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\camino-1.2.1\src\lib.rs C:\Users\p\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\camino-1.2.1\src\serde_impls.rs
-
-C:\Users\p\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\camino-1.2.1\src\lib.rs:
-C:\Users\p\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\camino-1.2.1\src\serde_impls.rs:

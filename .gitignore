@@ -12,6 +12,24 @@ dist
 dist-ssr
 *.local
 
+# Tauri / Rust build artifacts
+src-tauri/target/
+.cargo/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+
+# Release artifacts
+*.exe
+*.deb
+*.dmg
+release-assets/
+
+# Environment
+.env
+.env.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
