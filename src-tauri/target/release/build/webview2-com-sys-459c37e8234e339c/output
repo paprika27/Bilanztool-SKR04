@@ -1,0 +1,2 @@
+cargo:rustc-link-search=native=C:\git\Bilanztool-SKR04\src-tauri\target\release\build\webview2-com-sys-459c37e8234e339c\out\x64
+cargo:rustc-link-lib=advapi32
