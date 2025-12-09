@@ -1,0 +1,204 @@
+name: Build and release Tauri bundles
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-frontend:
+    name: Build frontend (Vite)
+    runs-on: ubuntu-latest
+    outputs:
+      dist-artifact: dist
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  build-packages:
+    name: Build Tauri bundles (matrix)
+    needs: build-frontend
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: ./dist
+
+      - name: Cache Cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: cargo-${{ matrix.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ matrix.os }}-
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ matrix.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            npm-${{ matrix.os }}-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Linux prerequisites (apt)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libwebkit2gtk-4.0-dev libssl-dev pkg-config
+
+      - name: macOS prerequisites (brew)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # some macOS runners already have required tooling; add extras if needed
+          brew update || true
+          brew install pkg-config
+
+      - name: Build Tauri bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Building on $RUNNER_OS ($RUNNER_OS_NAME)"
+          # Prefer an npm script wrapper if your package.json exposes one
+          if npm run | grep -q "tauri"; then
+            echo "Using npm tauri script to build"
+            npm run tauri -- build
+          elif command -v cargo-tauri >/dev/null 2>&1; then
+            echo "Using cargo tauri build"
+            cargo tauri build --manifest-path src-tauri/Cargo.toml
+          else
+            # Try npx fallback (assumes @tauri-apps/cli in devDependencies or available)
+            if npx --no-install tauri >/dev/null 2>&1; then
+              npx tauri build
+            else
+              echo "No tauri CLI found. Please add a 'tauri' npm script or install cargo-tauri in the runner."
+              exit 1
+            fi
+          fi
+
+      - name: List produced bundles (debug)
+        run: |
+          echo "Bundle listing"
+          ls -la src-tauri/target/release/bundle || true
+
+      - name: Upload built bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-${{ matrix.os }}
+          path: src-tauri/target/release/bundle/**
+
+  create-release:
+    name: Create release and attach bundles
+    needs: build-packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (fetch tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Ubuntu bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: tauri-ubuntu-latest
+          path: artifacts/ubuntu || true
+
+      - name: Download Windows bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: tauri-windows-latest
+          path: artifacts/windows || true
+
+      - name: Download macOS bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: tauri-macos-latest
+          path: artifacts/macos || true
+
+      - name: Determine next semver patch tag
+        id: tag
+        run: |
+          set -euo pipefail
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJ MIN PATCH <<< "$VERSION"
+          if [ -z "$MAJ" ]; then MAJ=0; MIN=0; PATCH=0; fi
+          PATCH=$((PATCH+1))
+          NEW_TAG="v${MAJ}.${MIN}.${PATCH}"
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "::set-output name=new_tag::$NEW_TAG"
+
+      - name: Create GitHub release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ env.NEW_TAG }}
+          release_name: Release ${{ env.NEW_TAG }}
+          body: Automatically generated Tauri builds
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload bundles to release (attach all found files)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPLOAD_URL: ${{ steps.create_release.outputs.upload_url }}
+        run: |
+          set -euo pipefail
+          cd artifacts || exit 0
+          # upload each file under artifacts/*
+          for file in $(find . -type f); do
+            FILE_PATH="${file#./}"
+            FILE_NAME=$(basename "$FILE_PATH")
+            echo "Uploading $FILE_PATH as $FILE_NAME"
+            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$FILE_PATH" "$UPLOAD_URL?name=$FILE_NAME"
+          done || true
