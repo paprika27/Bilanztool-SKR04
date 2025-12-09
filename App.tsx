@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, PieChart, Table, Settings, Printer, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutDashboard, FileText, PieChart, Table, Settings, Printer, AlertTriangle, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import ReportTable from './components/ReportTable';
 import AccountDetails from './components/AccountDetails';
@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useState<AccountBalance | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [expandAll, setExpandAll] = useState(false);
+  const [saldenSearchTerm, setSaldenSearchTerm] = useState('');
   
   // State für Custom Mappings
   const [customMapping, setCustomMapping] = useState<CustomAccountMapping>({});
@@ -228,33 +229,49 @@ const App: React.FC = () => {
               </div>
 
               {activeTab === 'SALDEN' && (
-                <div className="p-0 overflow-auto max-h-[700px]">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-100 text-gray-700 sticky top-0 z-10 shadow-sm">
-                      <tr>
-                        <th className="p-3">Kontonummer</th>
-                        <th className="p-3">Kontoname</th>
-                        <th className="p-3 text-right">Saldo</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {Object.values(rawAccounts)
-                        .sort((a, b) => parseInt(a.accountNumber) - parseInt(b.accountNumber))
-                        .map(acc => (
-                          <tr 
-                            key={acc.accountNumber} 
-                            className="hover:bg-blue-50 cursor-pointer transition-colors"
-                            onClick={() => setSelectedAccount(acc)}
-                          >
-                            <td className="p-3 font-mono text-blue-700 font-medium">{acc.accountNumber}</td>
-                            <td className="p-3 text-gray-800">{acc.accountName}</td>
-                            <td className={`p-3 text-right font-mono ${acc.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                              {acc.balance.toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+                <div className="p-6">
+                  <div className="mb-4 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Suchen nach Nummer oder Name..." 
+                      className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 bg-white"
+                      value={saldenSearchTerm}
+                      onChange={(e) => setSaldenSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="overflow-auto max-h-[650px]">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-100 text-gray-700 sticky top-0 z-10 shadow-sm">
+                        <tr>
+                          <th className="p-3">Kontonummer</th>
+                          <th className="p-3">Kontoname</th>
+                          <th className="p-3 text-right">Saldo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {Object.values(data.accounts)
+                          .filter(acc => 
+                            acc.accountNumber.includes(saldenSearchTerm) || 
+                            acc.accountName.toLowerCase().includes(saldenSearchTerm.toLowerCase())
+                          )
+                          .sort((a, b) => parseInt(a.accountNumber) - parseInt(b.accountNumber))
+                          .map(acc => (
+                            <tr 
+                              key={acc.accountNumber} 
+                              className="hover:bg-blue-50 cursor-pointer transition-colors"
+                              onClick={() => setSelectedAccount(acc)}
+                            >
+                              <td className="p-3 font-mono text-blue-700 font-medium">{acc.accountNumber}</td>
+                              <td className="p-3 text-gray-800">{acc.accountName}</td>
+                              <td className={`p-3 text-right font-mono ${acc.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                {acc.balance.toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
