@@ -15,7 +15,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-20.04/22.04 is safer for Tauri v1/v2 compatibility than 'latest'
         os: [ubuntu-22.04, windows-latest, macos-latest]
 
     steps:
@@ -55,25 +54,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__ # This helps the action determine the version from package.json
-          releaseName: 'App v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
-          prerelease: false
-          # We don't want the action to create the release *yet*, we just want it to build artifacts.
-          # We will upload them manually in the next job to combine them into one Release.
-          # However, tauri-action is great for handling the build command complexity:
+          # REMOVED release-related arguments so the action doesn't try to upload/find artifacts itself.
+          # We just want it to run the build command.
           args: ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
 
-      # --- Upload Artifacts ---
-      # Tauri stores bundles in specific paths. We upload them to pass to the release job.
+      # --- Upload Artifacts (Manual) ---
+
+      # Windows: Bundle + Portable
+      - name: Prepare Windows Artifacts
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          mkdir -p upload-win
+          # Copy the Installer
+          cp src-tauri/target/release/bundle/nsis/*.exe upload-win/
+          # Copy and Rename the Portable Exe
+          cp src-tauri/target/release/bilanztool-skr04.exe upload-win/bilanztool-skr04-portable.exe
+
       - name: Upload Windows Bundle
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: windows-bundle
-          path: src-tauri/target/release/bundle/nsis/*.exe
+          path: upload-win/*.exe
 
+      # Linux: Deb Bundle
       - name: Upload Linux Bundle
         if: matrix.os == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
@@ -81,12 +86,13 @@ jobs:
           name: linux-bundle
           path: src-tauri/target/release/bundle/deb/*.deb
 
+      # macOS: DMG Bundle (Note the universal-apple-darwin path!)
       - name: Upload macOS Bundle
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: macos-bundle
-          path: src-tauri/target/release/bundle/dmg/*.dmg
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
 
   create-release:
     name: Create Final Release
@@ -98,7 +104,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # --- Retrieve all artifacts ---
       - name: Download Windows Bundle
         uses: actions/download-artifact@v4
         with:
@@ -117,29 +122,16 @@ jobs:
           name: macos-bundle
           path: release-assets
 
-      # --- Versioning Logic ---
       - name: Determine Next Version
         id: version
         run: |
-          # Get the latest tag, default to v0.0.0 if none
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Current Tag: $LATEST_TAG"
-          
-          # Remove 'v'
           VERSION=${LATEST_TAG#v}
-          
-          # Split by dot
           IFS='.' read -r MAJ MIN PATCH <<< "$VERSION"
-          
-          # Increment Patch
           PATCH=$((PATCH+1))
-          
           NEW_TAG="v$MAJ.$MIN.$PATCH"
-          echo "New Tag: $NEW_TAG"
-          
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
-      # --- Create Release ---
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
