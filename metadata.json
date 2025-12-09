@@ -1,0 +1,5 @@
+{
+  "name": "BilanzTool SKR04",
+  "description": "Professional financial statement generator for SKR04 DATEV exports. Converts Excel ledgers into interactive Balance Sheets and P&L reports.",
+  "requestFramePermissions": []
+}
