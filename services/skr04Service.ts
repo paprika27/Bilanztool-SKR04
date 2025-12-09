@@ -5,8 +5,8 @@ export const structureDefs: StructureDefinition[] = [
   { id: 'aktiva_root', label: 'AKTIVA', type: 'ROOT', order: 1 },
   { id: 'av', label: 'A. Anlagevermögen', parent: 'aktiva_root', type: 'AKTIVA', order: 10 },
   { id: 'av_immat', label: 'I. Immaterielle Vermögensgegenstände', parent: 'av', type: 'AKTIVA', order: 11 },
-  { id: 'av_sach', label: 'II. Sachanlagen', parent: 'av', type: 'AKTIVA', order: 12 },
-  { id: 'av_finanz', label: 'III. Finanzanlagen', parent: 'av', type: 'AKTIVA', order: 13 },
+  { id: 'av_sach', label: 'I. Sachanlagen', parent: 'av', type: 'AKTIVA', order: 12 },
+  { id: 'av_finanz', label: 'II. Finanzanlagen', parent: 'av', type: 'AKTIVA', order: 13 },
   
   { id: 'uv', label: 'B. Umlaufvermögen', parent: 'aktiva_root', type: 'AKTIVA', order: 20 },
   { id: 'uv_vorrat', label: 'I. Vorräte', parent: 'uv', type: 'AKTIVA', order: 21 },
