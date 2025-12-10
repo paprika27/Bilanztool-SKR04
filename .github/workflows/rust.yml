@@ -54,27 +54,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # Build args (macOS universal, others default)
           args: ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
 
-      # --- Debug Step (Lists what was built) ---
-      - name: List Build Artifacts
-        shell: bash
-        run: |
-          echo "Listing target directory to find bundles..."
-          find src-tauri/target -name "*.deb" -o -name "*.dmg" -o -name "*.exe" || true
-
-      # --- Upload Artifacts ---
+      # --- Upload Artifacts (FLATTENED) ---
       
-      # Windows (Installer + Portable)
+      # 1. Windows: Setup (.exe), MSI (.msi), and Portable (.exe)
       - name: Prepare Windows Artifacts
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
           mkdir -p upload-win
-          # Use recursive search for the installer
+          # Copy Installers
           find src-tauri/target -name "*-setup.exe" -exec cp {} upload-win/ \;
-          # Use recursive search for the main binary and rename it
+          find src-tauri/target -name "*.msi" -exec cp {} upload-win/ \;
+          # Copy and Rename Portable
           find src-tauri/target -name "bilanztool-skr04.exe" -type f -not -path "*/deps/*" -exec cp {} upload-win/bilanztool-skr04-portable.exe \;
 
       - name: Upload Windows Bundle
@@ -82,53 +75,45 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-bundle
-          path: upload-win/*.exe
+          path: upload-win/*
 
-      # 1. Windows: Copy .exe files to a flat 'upload-win' folder
-      - name: Prepare Windows Artifacts
-        if: matrix.os == 'windows-latest'
-        shell: bash
-        run: |
-          mkdir -p upload-win
-          find src-tauri/target -name "*-setup.exe" -exec cp {} upload-win/ \;
-          find src-tauri/target -name "bilanztool-skr04.exe" -type f -not -path "*/deps/*" -exec cp {} upload-win/bilanztool-skr04-portable.exe \;
-
-      - name: Upload Windows Bundle
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-bundle
-          path: upload-win/*.exe
-
-      # 2. Linux: Copy .deb files to a flat 'upload-linux' folder
+      # 2. Linux: Deb, RPM, AppImage
       - name: Prepare Linux Artifacts
         if: matrix.os == 'ubuntu-22.04'
         run: |
           mkdir -p upload-linux
-          # Find any .deb file in the target directory and copy it here
           find src-tauri/target -name "*.deb" -exec cp {} upload-linux/ \;
+          find src-tauri/target -name "*.rpm" -exec cp {} upload-linux/ \;
+          find src-tauri/target -name "*.AppImage" -exec cp {} upload-linux/ \;
 
       - name: Upload Linux Bundle
         if: matrix.os == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
         with:
           name: linux-bundle
-          path: upload-linux/*.deb
+          path: upload-linux/*
 
-      # 3. macOS: Copy .dmg files to a flat 'upload-mac' folder
+      # 3. macOS: DMG and compressed .app
       - name: Prepare macOS Artifacts
         if: matrix.os == 'macos-latest'
         run: |
           mkdir -p upload-mac
-          # Find any .dmg file in the target directory and copy it here
+          # Copy DMG
           find src-tauri/target -name "*.dmg" -exec cp {} upload-mac/ \;
+          
+          # Find the .app folder and compress it (GitHub can't release a folder)
+          APP_PATH=$(find src-tauri/target -name "*.app" | head -n 1)
+          if [ -d "$APP_PATH" ]; then
+            echo "Compressing $APP_PATH..."
+            tar -czf "upload-mac/$(basename "$APP_PATH").tar.gz" -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
+          fi
 
       - name: Upload macOS Bundle
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: macos-bundle
-          path: upload-mac/*.dmg
+          path: upload-mac/*
 
   create-release:
     name: Create Final Release
@@ -168,16 +153,34 @@ jobs:
           NEW_TAG="v$MAJ.$MIN.$PATCH"
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
+      # --- Generate Release Notes to explain the files ---
+      - name: Generate Release Body
+        id: release_body
+        run: |
+          echo "BODY<<EOF" >> $GITHUB_OUTPUT
+          echo "## Downloads" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "| Platform | File Type | Recommended For |" >> $GITHUB_OUTPUT
+          echo "| :--- | :--- | :--- |" >> $GITHUB_OUTPUT
+          echo "| **Windows** | \`.exe\` (Setup) | Standard Installation |" >> $GITHUB_OUTPUT
+          echo "| | \`.msi\` | Enterprise / IT Deployments |" >> $GITHUB_OUTPUT
+          echo "| | \`-portable.exe\` | Run without installing |" >> $GITHUB_OUTPUT
+          echo "| **macOS** | \`.dmg\` | Standard Installation |" >> $GITHUB_OUTPUT
+          echo "| | \`.app.tar.gz\` | Manual / Advanced use |" >> $GITHUB_OUTPUT
+          echo "| **Linux** | \`.deb\` | Ubuntu, Debian, Mint |" >> $GITHUB_OUTPUT
+          echo "| | \`.rpm\` | Fedora, Red Hat, SUSE |" >> $GITHUB_OUTPUT
+          echo "| | \`.AppImage\` | Universal (Distro agnostic) |" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.new_tag }}
           name: Release ${{ steps.version.outputs.new_tag }}
+          body: ${{ steps.release_body.outputs.BODY }}
           draft: false
           prerelease: false
           files: |
-            release-assets/*.exe
-            release-assets/*.deb
-            release-assets/*.dmg
+            release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
