@@ -84,21 +84,51 @@ jobs:
           name: windows-bundle
           path: upload-win/*.exe
 
-      # Linux (Find .deb anywhere in target)
+      # 1. Windows: Copy .exe files to a flat 'upload-win' folder
+      - name: Prepare Windows Artifacts
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          mkdir -p upload-win
+          find src-tauri/target -name "*-setup.exe" -exec cp {} upload-win/ \;
+          find src-tauri/target -name "bilanztool-skr04.exe" -type f -not -path "*/deps/*" -exec cp {} upload-win/bilanztool-skr04-portable.exe \;
+
+      - name: Upload Windows Bundle
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: upload-win/*.exe
+
+      # 2. Linux: Copy .deb files to a flat 'upload-linux' folder
+      - name: Prepare Linux Artifacts
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          mkdir -p upload-linux
+          # Find any .deb file in the target directory and copy it here
+          find src-tauri/target -name "*.deb" -exec cp {} upload-linux/ \;
+
       - name: Upload Linux Bundle
         if: matrix.os == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
         with:
           name: linux-bundle
-          path: src-tauri/target/**/bundle/deb/*.deb
+          path: upload-linux/*.deb
 
-      # macOS (Find .dmg anywhere in target)
+      # 3. macOS: Copy .dmg files to a flat 'upload-mac' folder
+      - name: Prepare macOS Artifacts
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p upload-mac
+          # Find any .dmg file in the target directory and copy it here
+          find src-tauri/target -name "*.dmg" -exec cp {} upload-mac/ \;
+
       - name: Upload macOS Bundle
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: macos-bundle
-          path: src-tauri/target/**/bundle/dmg/*.dmg
+          path: upload-mac/*.dmg
 
   create-release:
     name: Create Final Release
