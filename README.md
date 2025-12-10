@@ -36,29 +36,61 @@
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- **Node.js** 18+ ([Download](https://nodejs.org/))
+Choose one of the two simple ways below. For most users, downloading a prebuilt installer is the easiest and recommended option.
 
-### Installation
+### Option A — Installers (recommended, non-technical users)
 
-1. **Clone or download this repository:**
-   ```bash
-   git clone https://github.com/paprika27/Bilanztool-SKR04.git
-   cd Bilanztool-SKR04
-   ```
+- Go to the project's GitHub Releases page: `https://github.com/paprika27/Bilanztool-SKR04/releases`
+- Download the installer for your platform from the latest Release assets.
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+- Windows: download the `*.exe` (NSIS) installer and run it — follow the on-screen installer steps.
+  - If an `*.msi` is preferred you can also use that.
+  - If a `*-portable.exe` is preferred you can use that.
 
-3. **Start development server:**
-   ```bash
-   npm run dev
-   ```
+- macOS: download the `*.dmg`, open it, and drag the app into `/Applications`.
+  - Important: the macOS app may be unsigned (no Apple Developer key configured in CI). If macOS refuses to open it, right-click the app and choose Open, or run the quarantine removal command below.
 
-4. **Open in browser:**
-   Navigate to `http://localhost:3000` (or the URL shown in terminal)
+- Linux (Debian/Ubuntu): download the `*.deb` package and either double-click it in your file manager or run:
+
+```bash
+sudo dpkg -i BilanzTool_SKR04_<version>_amd64.deb
+sudo apt-get install -f
+```
+
+- Docker (alternative for advanced / server users): a prebuilt image is published to GitHub Container Registry (`ghcr.io/paprika27/bilanztool-skr04:latest`). Pull and run with:
+
+```bash
+docker pull ghcr.io/paprika27/bilanztool-skr04:latest
+docker run --rm -p 3000:3000 ghcr.io/paprika27/bilanztool-skr04:latest
+```
+
+### Quick macOS Gatekeeper workaround (if app is blocked)
+
+```bash
+# Right-click the app and choose Open, or use this terminal command:
+sudo xattr -r -d com.apple.quarantine /Applications/BilanzTool\ SKR04.app
+```
+
+### Option B — Run locally (developers / power users)
+
+If you want to run the development server or build the web UI yourself, use Node.js. This is optional — regular users do not need to do this.
+
+1. Install Node.js 18+ ([download](https://nodejs.org/)).
+2. Clone the repo and install dependencies:
+
+```bash
+git clone https://github.com/paprika27/Bilanztool-SKR04.git
+cd Bilanztool-SKR04
+npm install
+```
+
+3. Start the development server:
+
+```bash
+npm run dev
+```
+
+4. Open your browser at `http://localhost:3000` (or the URL shown in the terminal).
 
 ---
 
@@ -214,37 +246,58 @@ Found a bug or have a feature request? Feel free to open an issue or submit a pu
 
 This repository builds desktop installers (Windows `.exe`, Linux `.deb`, macOS `.dmg`) and a Docker image via GitHub Actions. The CI workflows are defined in `.github/workflows/rust.yml` (builds the native bundles and creates the Release) and `.github/workflows/publish-ghcr.yml` (builds & pushes a Docker image to GitHub Container Registry).
 
-- **Docker (GHCR):** The Docker image is published to GHCR under your account as `ghcr.io/<owner>/bilanztool-skr04:latest` (see `publish-ghcr.yml`). To pull and run the container:
+This repository builds desktop installers and several distributable bundle types via GitHub Actions. The relevant CI workflows are:
+
+- `.github/workflows/rust.yml` — builds native bundles on Linux, Windows and macOS runners and creates the GitHub Release (collects artifacts from the build matrix).
+- `.github/workflows/publish-ghcr.yml` — builds and pushes the Docker image to GitHub Container Registry (GHCR).
+
+CI-produced artifacts and recommended usage:
+
+- **Docker (GHCR):** `ghcr.io/<owner>/bilanztool-skr04:latest` (see `publish-ghcr.yml`). Pull & run:
 
 ```bash
 docker pull ghcr.io/paprika27/bilanztool-skr04:latest
-# Run (if the image serves the web UI on an internal port, map it; otherwise this is a generic example):
 docker run --rm -p 3000:3000 ghcr.io/paprika27/bilanztool-skr04:latest
 ```
 
-- **Windows installer (.exe):** The Windows NSIS installer is produced by the `rust.yml` workflow and attached to the GitHub Release. Download the `.exe` from the Release assets and run it to install. If you prefer a portable binary, the release also contains the built executables.
+- **Windows**
+  - `.exe` (NSIS setup): Standard installer for end users — run the installer and follow prompts.
+  - `.msi`: Enterprise-friendly installer suitable for automated deployments via SCCM or other management tools.
+  - `*-portable.exe` (portable): Standalone executable that runs without installation — place it in a folder and run directly.
 
-- **Deb package (.deb):** The Debian package is produced by the CI and attached to the Release. Install with:
+- **macOS**
+  - `.dmg`: Standard disk image installer — open and drag the app to `/Applications`.
+  - `.app.tar.gz`: A compressed `.app` bundle (useful for advanced/manual installation or advanced users who want the raw app bundle). GitHub Release contains a compressed `.app` because Releases do not accept folders.
+  - Note: I do NOT have an Apple Developer signing key configured in CI. Unsigned `.dmg`/`.app` bundles may be blocked by Gatekeeper. If macOS prevents opening the app, the user can right-click the app and choose Open, or run the quarantine removal workaround.
+
+- **Linux**
+  - `.deb`: Debian/Ubuntu installer — install via `dpkg -i` or double-click in a file manager.
+  - `.rpm`: RPM package for Fedora/Red Hat/SUSE family distributions.
+  - `.AppImage`: A portable, distro-agnostic single-file executable great for many desktop Linux users.
+
+All of the above artifacts are attached to the GitHub Release by the `create-release` job in `rust.yml` (the job uploads everything found under the `release-assets` folder). The release body generated by CI includes a simple table describing each file type and recommended audience.
+
+Example install / run commands (copy-paste):
 
 ```bash
+# Debian/Ubuntu
 sudo dpkg -i BilanzTool_SKR04_<version>_amd64.deb
-sudo apt-get install -f    # fix missing deps if necessary
+sudo apt-get install -f
+
+# Run portable Windows exe (on Windows PowerShell / cmd just run the .exe)
+# Docker (Linux/any):
+docker run --rm -p 3000:3000 ghcr.io/paprika27/bilanztool-skr04:latest
 ```
 
-- **macOS disk image (.dmg):** The `rust.yml` build produces a `.dmg` and attaches it to the Release. Typical install flow is to open the `.dmg` and drag the app to `/Applications`.
-
-Important note about macOS signing: I do NOT have an Apple Developer signing key configured for CI. Unsigned `.dmg`/app bundles can be blocked by Gatekeeper on newer macOS versions. If the app won't run after installation, you can temporarily bypass Gatekeeper with:
+macOS Gatekeeper workaround (if app is blocked):
 
 ```bash
 # Right-click the app and choose Open, or use:
 sudo xattr -r -d com.apple.quarantine /Applications/BilanzTool\ SKR04.app
 ```
 
-If you plan to distribute to macOS users broadly, configure an Apple Developer signing identity in your repository secrets and update the CI to sign the build.
-
-### Where to get releases
-Releases are published via the `create-release` job in `.github/workflows/rust.yml`. The release assets include `*.exe`, `*.deb`, and `*.dmg` when those artifacts were built for their respective OS runners. See the latest GitHub Release for downloadable installers.
-
+Where to get releases
+- Visit the project's Releases page on GitHub: `https://github.com/paprika27/Bilanztool-SKR04/releases` and download the platform-appropriate file(s) listed in the assets.
 
 ## 📄 License
 
@@ -270,4 +323,4 @@ For questions or issues specific to SKR04 accounting standards, consult:
 
 ---
 
-**Built with ❤️ for German business accounting professionals**
+**Built with ❤️ for German business professionals**
