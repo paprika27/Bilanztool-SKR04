@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, PieChart, Table, Settings, Printer, AlertTriangle, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { LayoutDashboard, FileText, PieChart, Table, Settings, Printer, AlertTriangle, ChevronDown, ChevronUp, Search, RefreshCw, FilePlus, Calculator, XCircle } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import ReportTable from './components/ReportTable';
 import AccountDetails from './components/AccountDetails';
 import AccountManager from './components/AccountManager';
+import KPIBoard from './components/KPIBoard';
 import { parseExcelFile } from './services/excelService';
 import { generateFinancialReport } from './services/skr04Service';
 import { FinancialData, AccountBalance, CustomAccountMapping, Booking } from './types';
@@ -13,48 +14,95 @@ const App: React.FC = () => {
   const [rawAccounts, setRawAccounts] = useState<Record<string, AccountBalance>>({});
   const [rawBookings, setRawBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'BILANZ' | 'GUV' | 'JOURNAL' | 'KONTEN' | 'SALDEN'>('BILANZ');
+  const [activeTab, setActiveTab] = useState<'BILANZ' | 'GUV' | 'KPI' | 'JOURNAL' | 'KONTEN' | 'SALDEN'>('BILANZ');
   const [selectedAccount, setSelectedAccount] = useState<AccountBalance | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [expandAll, setExpandAll] = useState(false);
   const [saldenSearchTerm, setSaldenSearchTerm] = useState('');
+  const [showUnassignedDetails, setShowUnassignedDetails] = useState(false);
   
   // State für Custom Mappings
   const [customMapping, setCustomMapping] = useState<CustomAccountMapping>({});
 
-  // Re-Generate Report wenn Mappings sich ändern
-  useEffect(() => {
-    if (Object.keys(rawAccounts).length > 0) {
-      // Deep Copy der Accounts, damit Namen nicht permanent im Raw-State überschrieben werden
-      const accountsCopy = JSON.parse(JSON.stringify(rawAccounts));
-      
+  // Trigger Report Generation
+  const refreshReport = (accounts: Record<string, AccountBalance>) => {
+      const accountsCopy = JSON.parse(JSON.stringify(accounts));
       const report = generateFinancialReport(accountsCopy, customMapping);
       report.journal = rawBookings;
       setData(report);
-    }
-  }, [customMapping, rawAccounts, rawBookings]);
+  };
 
-  const handleFileUpload = async (file: File) => {
+  useEffect(() => {
+    if (Object.keys(rawAccounts).length > 0) {
+      refreshReport(rawAccounts);
+    }
+  }, [customMapping, rawAccounts]);
+
+  const processFiles = async (files: File[], mode: 'replace' | 'append') => {
     setLoading(true);
     try {
-      const { accounts, bookings } = await parseExcelFile(file);
-      setRawAccounts(accounts);
-      setRawBookings(bookings);
-      // Triggered useEffect via State update
-      setActiveTab('BILANZ');
+        let currentAccounts = mode === 'replace' ? {} : { ...rawAccounts };
+        let currentBookings = mode === 'replace' ? [] : [...rawBookings];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const idPrefix = mode === 'append' ? `add_${Date.now()}_${i}` : `f${i}_${Date.now()}`;
+            const { accounts: newAccounts, bookings: newBookings } = await parseExcelFile(file, idPrefix);
+
+            // Merge Logic
+            Object.values(newAccounts).forEach(newAcc => {
+                const existing = currentAccounts[newAcc.accountNumber];
+                if (existing) {
+                    existing.balance += newAcc.balance;
+                    existing.bookings = [...existing.bookings, ...newAcc.bookings].sort((a,b) => a.rawDate - b.rawDate);
+                    
+                    // Merge yearly balances
+                    Object.entries(newAcc.yearlyBalances).forEach(([year, amount]) => {
+                        const y = parseInt(year);
+                        existing.yearlyBalances[y] = (existing.yearlyBalances[y] || 0) + amount;
+                    });
+                } else {
+                    currentAccounts[newAcc.accountNumber] = newAcc;
+                }
+            });
+            currentBookings = [...currentBookings, ...newBookings];
+        }
+
+        setRawAccounts(currentAccounts);
+        setRawBookings(currentBookings);
+        
+        if (mode === 'replace') setActiveTab('BILANZ');
+        const msg = files.length > 1 
+            ? `${files.length} Dateien erfolgreich verarbeitet.` 
+            : 'Datei erfolgreich verarbeitet.';
+        // alert(msg); // Optional: Alert removal for smoother UX
+
     } catch (e) {
       console.error(e);
-      alert("Fehler beim Lesen der Datei. Bitte stellen Sie sicher, dass es sich um eine gültige Excel-Datei handelt.");
+      alert("Fehler beim Verarbeiten der Dateien. Bitte prüfen Sie das Format.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleFileUpload = (files: File[]) => processFiles(files, 'replace');
+
+  const handleAppendFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          processFiles(Array.from(e.target.files), 'append');
+      }
+  };
+
+  const handleReload = () => {
+      setData(null);
+      setRawAccounts({});
+      setRawBookings([]);
+      setCustomMapping({});
+      setActiveTab('BILANZ');
+  };
+
   const handlePrint = () => {
-    // 1. Set printing state to true (forces tables to expand)
     setIsPrinting(true);
-    
-    // 2. Wait for render, then print, then reset
     setTimeout(() => {
       window.print();
       setIsPrinting(false);
@@ -64,7 +112,7 @@ const App: React.FC = () => {
   const TabButton = ({ id, icon: Icon, label }: any) => (
     <button
       onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors print:hidden ${
+      className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors print:hidden whitespace-nowrap ${
         activeTab === id 
           ? 'bg-blue-600 text-white shadow-md' 
           : 'bg-white text-gray-600 hover:bg-gray-50 border-b-2 border-transparent'
@@ -75,52 +123,86 @@ const App: React.FC = () => {
     </button>
   );
 
+  // Helper for Header Columns in Bilanz/GuV - Updated width logic
+  const HeaderColumns = () => (
+      <div className="flex items-center justify-end font-semibold text-gray-500 text-sm mb-2 pr-4 min-w-max">
+          {data?.years.map((year, idx) => (
+              <React.Fragment key={year}>
+                  <div className="w-32 text-right px-2">{year}</div>
+                  {data?.years[idx + 1] && <div className="w-8"></div>}
+              </React.Fragment>
+          ))}
+      </div>
+  );
+  
+  // Logic to determine layout of Bilanz (stack if multiple years, side-by-side if single year)
+  const bilanzGridClass = data && data.years.length > 1 
+      ? "block space-y-8" 
+      : "grid md:grid-cols-2 gap-8";
+
   return (
     <div className="min-h-screen pb-20 print:pb-0 print:bg-white text-gray-900">
-      {/* Header - Hide on Print */}
+      {/* Header */}
       <header className="bg-slate-900 text-white p-6 shadow-lg print:hidden">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <div className="w-full max-w-[98%] mx-auto flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">BilanzTool SKR04</h1>
             <p className="text-slate-400 text-sm mt-1">Jahresabschluss & Auswertung</p>
           </div>
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-3 items-center">
             {data && (
               <>
+                 <button 
+                  onClick={handleReload}
+                  className="p-2 bg-slate-800 hover:bg-red-900/50 rounded text-slate-300 hover:text-white transition-colors"
+                  title="Neu laden / Reset"
+                >
+                  <RefreshCw size={18} />
+                </button>
+                <label className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded text-sm font-medium transition-colors cursor-pointer border border-slate-700">
+                   <FilePlus size={16} />
+                   <span>Import (+)</span>
+                   <input type="file" className="hidden" accept=".xlsx,.xls,.xlsm" multiple onChange={handleAppendFile} />
+                </label>
+                
+                <div className="h-6 w-px bg-slate-700 mx-1"></div>
+
                 <button 
                   onClick={() => setExpandAll(!expandAll)}
                   className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition-colors"
                 >
                   {expandAll ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  {expandAll ? 'Alle einklappen' : 'Alle ausklappen'}
+                  {expandAll ? 'Einklappen' : 'Ausklappen'}
                 </button>
                 <button 
                   onClick={handlePrint}
                   className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium transition-colors"
                 >
                   <Printer size={16} />
-                  Export / Druck
+                  Drucken
                 </button>
+                <div className={`px-4 py-2 rounded-lg font-bold text-sm ${data.bilanz.check.balanced ? 'bg-green-600' : 'bg-red-600'}`}>
+                    {data.bilanz.check.balanced ? 'OK' : 'Diff'}
+                </div>
               </>
-            )}
-            {data && (
-              <div className={`px-4 py-2 rounded-lg font-bold text-sm ${data.bilanz.check.balanced ? 'bg-green-600' : 'bg-red-600'}`}>
-                {data.bilanz.check.balanced 
-                  ? 'Bilanz ausgeglichen' 
-                  : `Differenz: ${data.bilanz.check.diff.toLocaleString('de-DE', {style:'currency', currency:'EUR'})}`}
-              </div>
             )}
           </div>
         </div>
       </header>
 
-      {/* Print Header Only */}
+      {/* Print Header */}
       <div className="hidden print:block p-8 pb-0">
          <h1 className="text-3xl font-bold mb-2">Jahresabschluss Auswertung</h1>
          <p className="text-gray-500">Erstellt am {new Date().toLocaleDateString()}</p>
+         {data && (
+             <div className="mt-2 text-sm text-gray-600">
+                 Geschäftsjahre: {data.years.join(', ')}
+             </div>
+         )}
       </div>
 
-      <main className="max-w-7xl mx-auto mt-8 px-4 print:mt-4 print:px-0 print:max-w-none">
+      {/* Main Container - Updated to use wider percentage on large screens */}
+      <main className="w-full max-w-[98%] mx-auto mt-8 px-4 print:mt-4 print:px-0 print:max-w-none">
         {!data ? (
           <div className="max-w-xl mx-auto mt-20">
             <FileUpload onFileSelect={handleFileUpload} isLoading={loading} />
@@ -135,99 +217,138 @@ const App: React.FC = () => {
                     <AlertTriangle className="h-5 w-5 text-amber-600" />
                   </div>
                   <div className="ml-3 w-full">
-                    <h3 className="text-sm font-medium text-amber-800">
-                      Nicht zugeordnete Konten ({data.unassigned.length})
-                    </h3>
-                    <div className="mt-2 text-sm text-amber-700">
-                      <p className="mb-2">
-                        Folgende Konten konnten nicht automatisch zugeordnet werden (oder sind Vortragskonten mit Saldo). 
-                        Dies führt wahrscheinlich zur Bilanzdifferenz. Bitte ordnen Sie diese im Kontenplan zu oder korrigieren Sie die Buchungen.
-                      </p>
-                      <div className="bg-white/50 rounded overflow-hidden border border-amber-200">
-                        <table className="min-w-full text-sm">
-                           <thead className="bg-amber-100/50">
-                             <tr>
-                               <th className="px-3 py-1 text-left">Nr.</th>
-                               <th className="px-3 py-1 text-left">Name</th>
-                               <th className="px-3 py-1 text-right">Saldo</th>
-                             </tr>
-                           </thead>
-                           <tbody>
-                             {data.unassigned.map(acc => (
-                               <tr key={acc.accountNumber} 
-                                   className="cursor-pointer hover:bg-amber-100"
-                                   onClick={() => setSelectedAccount(acc)}>
-                                 <td className="px-3 py-1 font-mono">{acc.accountNumber}</td>
-                                 <td className="px-3 py-1">{acc.accountName}</td>
-                                 <td className={`px-3 py-1 text-right font-mono ${acc.balance < 0 ? 'text-red-700' : 'text-green-700'}`}>
-                                   {acc.balance.toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
-                                 </td>
-                               </tr>
-                             ))}
-                           </tbody>
-                        </table>
-                      </div>
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-sm font-medium text-amber-800">
+                          {data.unassigned.length} nicht zugeordnete Konten gefunden
+                        </h3>
+                        <button 
+                           onClick={() => setShowUnassignedDetails(!showUnassignedDetails)}
+                           className="text-amber-700 hover:text-amber-900 text-xs underline font-semibold"
+                        >
+                           {showUnassignedDetails ? 'Verbergen' : 'Details anzeigen'}
+                        </button>
                     </div>
+                    
+                    {showUnassignedDetails && (
+                        <div className="mt-3 bg-white/50 rounded p-2 border border-amber-200 text-sm max-h-40 overflow-y-auto">
+                           <p className="text-xs text-amber-800 mb-2">Bitte ordnen Sie diese Konten im Tab "Kontenplan" zu:</p>
+                           <ul className="space-y-1">
+                               {data.unassigned.map(acc => (
+                                   <li key={acc.accountNumber} className="flex gap-2">
+                                       <span className="font-mono font-bold text-amber-900">{acc.accountNumber}</span>
+                                       <span className="text-amber-800 truncate">{acc.accountName}</span>
+                                       <span className="text-amber-600 ml-auto tabular-nums">{acc.balance.toLocaleString('de-DE', {style:'currency', currency:'EUR'})}</span>
+                                   </li>
+                               ))}
+                           </ul>
+                        </div>
+                    )}
+                    {!showUnassignedDetails && (
+                         <div className="mt-1 text-xs text-amber-700">
+                             Beispiele: {data.unassigned.slice(0, 5).map(a => a.accountNumber).join(', ')}...
+                         </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Tabs - Hide on Print */}
-            <div className="flex border-b border-gray-200 bg-white rounded-t-lg shadow-sm overflow-hidden mb-6 print:hidden">
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 bg-white rounded-t-lg shadow-sm overflow-hidden mb-6 print:hidden overflow-x-auto">
               <TabButton id="BILANZ" icon={LayoutDashboard} label="Bilanz" />
               <TabButton id="GUV" icon={PieChart} label="GuV" />
+              <TabButton id="KPI" icon={Calculator} label="KPI" />
               <TabButton id="SALDEN" icon={FileText} label="Summe/Salden" />
               <TabButton id="KONTEN" icon={Settings} label="Kontenplan" />
               <TabButton id="JOURNAL" icon={Table} label="Journal" />
             </div>
 
-            {/* Content */}
             <div className={`bg-white rounded-lg shadow-sm border border-gray-200 min-h-[500px] print:border-0 print:shadow-none`}>
               
-              {/* BILANZ VIEW (Always show in print if visible or print mode overrides tab) */}
+              {/* BILANZ VIEW */}
               <div className={activeTab === 'BILANZ' ? 'block' : 'hidden print:block'}>
-                 <div className="grid md:grid-cols-2 gap-8 p-6 print:block print:p-8">
-                  <div className="space-y-4 print:mb-8">
-                    <h3 className="text-lg font-bold text-gray-800 border-b pb-2">AKTIVA</h3>
-                    <ReportTable 
-                      data={data.bilanz.aktiva} 
-                      onSelectAccount={setSelectedAccount} 
-                      root 
-                      forceExpanded={isPrinting || expandAll}
-                    />
+                 <div className={`${bilanzGridClass} p-6 print:block print:p-8`}>
+                  
+                  {/* AKTIVA */}
+                  <div className="space-y-4 print:mb-8 overflow-hidden">
+                    <div className="overflow-x-auto pb-2">
+                        <div className="min-w-max">
+                            <div className="flex justify-between items-end border-b pb-2">
+                                <h3 className="text-lg font-bold text-gray-800">AKTIVA</h3>
+                                <HeaderColumns />
+                            </div>
+                            <ReportTable 
+                            data={data.bilanz.aktiva} 
+                            onSelectAccount={setSelectedAccount} 
+                            root 
+                            forceExpanded={isPrinting || expandAll}
+                            years={data.years}
+                            />
+                        </div>
+                    </div>
                   </div>
-                  <div className="space-y-4 print:break-before-page">
-                    <h3 className="text-lg font-bold text-gray-800 border-b pb-2">PASSIVA</h3>
-                    <ReportTable 
-                      data={data.bilanz.passiva} 
-                      onSelectAccount={setSelectedAccount} 
-                      root 
-                      forceExpanded={isPrinting || expandAll}
-                    />
+
+                  {/* PASSIVA */}
+                  <div className="space-y-4 print:break-before-page overflow-hidden">
+                     <div className="overflow-x-auto pb-2">
+                        <div className="min-w-max">
+                            <div className="flex justify-between items-end border-b pb-2">
+                                <h3 className="text-lg font-bold text-gray-800">PASSIVA</h3>
+                                <HeaderColumns />
+                            </div>
+                            <ReportTable 
+                            data={data.bilanz.passiva} 
+                            onSelectAccount={setSelectedAccount} 
+                            root 
+                            forceExpanded={isPrinting || expandAll}
+                            years={data.years}
+                            />
+                        </div>
+                     </div>
                   </div>
                 </div>
               </div>
 
               {/* GUV VIEW */}
               <div className={(activeTab === 'GUV' ? 'block' : 'hidden print:block print:break-before-page')}>
-                <div className="p-6 max-w-4xl mx-auto print:max-w-none print:p-8">
-                   <h2 className="hidden print:block text-xl font-bold mb-4">Gewinn- und Verlustrechnung</h2>
-                   <div className="flex justify-between items-center mb-6 bg-slate-50 p-4 rounded border print:border-gray-300">
-                      <span className="font-medium text-gray-700">Jahresergebnis</span>
-                      <span className={`text-2xl font-bold ${data.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {data.profit.toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
-                      </span>
+                <div className="p-6 w-full print:max-w-none print:p-8 overflow-x-auto">
+                   <div className="min-w-max">
+                        <h2 className="hidden print:block text-xl font-bold mb-4">Gewinn- und Verlustrechnung</h2>
+                        
+                        <div className="flex justify-between items-center mb-6 bg-slate-50 p-4 rounded border print:border-gray-300 min-w-max">
+                            <span className="font-medium text-gray-700 mr-8">Jahresergebnis</span>
+                            <div className="flex gap-8">
+                                {data.years.map(y => (
+                                    <div key={y} className="text-right w-32">
+                                        <div className="text-xs text-gray-500 mb-1">{y}</div>
+                                        <div className={`text-xl font-bold ${data.yearlyProfits[y] >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {data.yearlyProfits[y].toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mb-2">
+                            <HeaderColumns />
+                        </div>
+                        <ReportTable 
+                            data={data.guv} 
+                            onSelectAccount={setSelectedAccount} 
+                            root 
+                            forceExpanded={isPrinting || expandAll}
+                            years={data.years}
+                        />
                    </div>
-                   <ReportTable 
-                    data={data.guv} 
-                    onSelectAccount={setSelectedAccount} 
-                    root 
-                    forceExpanded={isPrinting || expandAll}
-                   />
                 </div>
               </div>
+              
+              {/* KPI VIEW */}
+              {activeTab === 'KPI' && (
+                  <KPIBoard data={data} years={data.years} />
+              )}
 
+              {/* SALDEN VIEW */}
               {activeTab === 'SALDEN' && (
                 <div className="p-6">
                   <div className="mb-4 relative">
@@ -244,9 +365,11 @@ const App: React.FC = () => {
                     <table className="w-full text-sm text-left">
                       <thead className="bg-gray-100 text-gray-700 sticky top-0 z-10 shadow-sm">
                         <tr>
-                          <th className="p-3">Kontonummer</th>
+                          <th className="p-3 w-20">Nr.</th>
                           <th className="p-3">Kontoname</th>
-                          <th className="p-3 text-right">Saldo</th>
+                          {data.years.map(y => (
+                              <th key={y} className="p-3 text-right w-32">{y}</th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -264,9 +387,11 @@ const App: React.FC = () => {
                             >
                               <td className="p-3 font-mono text-blue-700 font-medium">{acc.accountNumber}</td>
                               <td className="p-3 text-gray-800">{acc.accountName}</td>
-                              <td className={`p-3 text-right font-mono ${acc.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                                {acc.balance.toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
-                              </td>
+                              {data.years.map(y => (
+                                  <td key={y} className={`p-3 text-right font-mono w-32 tabular-nums ${(acc.yearlyBalances[y] || 0) < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                    {(acc.yearlyBalances[y] || 0).toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                  </td>
+                              ))}
                             </tr>
                           ))}
                       </tbody>
@@ -275,6 +400,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
+              {/* KONTEN PLAN */}
               {activeTab === 'KONTEN' && (
                 <div className="print:hidden">
                   <AccountManager 
@@ -285,6 +411,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
+              {/* JOURNAL */}
               {activeTab === 'JOURNAL' && (
                 <div className="p-0 overflow-auto max-h-[700px] print:hidden">
                   <table className="w-full text-sm text-left">
@@ -313,11 +440,6 @@ const App: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
-                  {data.journal.length > 500 && (
-                    <div className="p-4 text-center text-gray-500 bg-gray-50">
-                      Zeige erste 500 von {data.journal.length} Buchungen. Für vollständiges Journal bitte Excel prüfen.
-                    </div>
-                  )}
                 </div>
               )}
             </div>

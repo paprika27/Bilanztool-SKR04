@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, Files } from 'lucide-react';
 
 interface Props {
-  onFileSelect: (file: File) => void;
+  onFileSelect: (files: File[]) => void;
   isLoading: boolean;
 }
 
@@ -10,8 +10,8 @@ const FileUpload: React.FC<Props> = ({ onFileSelect, isLoading }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      onFileSelect(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      onFileSelect(Array.from(e.target.files));
     }
   };
 
@@ -24,16 +24,17 @@ const FileUpload: React.FC<Props> = ({ onFileSelect, isLoading }) => {
         ref={fileInputRef} 
         onChange={handleChange}
         accept=".xlsx,.xls,.xlsm"
+        multiple
       />
       <div className="bg-blue-100 p-4 rounded-full mb-4">
-        <Upload className="w-8 h-8 text-blue-600" />
+        <Files className="w-8 h-8 text-blue-600" />
       </div>
       <h3 className="text-xl font-semibold text-gray-800 mb-2">
-        {isLoading ? 'Verarbeite Daten...' : 'Excel-Datei hier ablegen'}
+        {isLoading ? 'Verarbeite Daten...' : 'Excel-Dateien hier ablegen'}
       </h3>
       <p className="text-gray-500 text-center max-w-sm">
         Unterstützt .xlsx, .xlsm (DATEV Format).<br/>
-        Die Daten werden lokal im Browser verarbeitet.
+        Mehrere Dateien können gleichzeitig ausgewählt werden.
       </p>
     </div>
   );

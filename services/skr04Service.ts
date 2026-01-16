@@ -122,9 +122,6 @@ const mapAccountToStructure = (accountNum: string, mapping?: CustomAccountMappin
   if (num >= 7600 && num < 7650) return 'steuern_er';
   if (num >= 7000 && num < 8000) return 'steuern_sonst';
 
-  // Klasse 9 (Vortragskonten) und Klasse 8 (Statistik) oder ungültige
-  // werden HIER nicht mehr automatisch zugeordnet.
-  // Das sorgt dafür, dass 9000 etc. als "Unassigned" zurückkommen.
   return null;
 };
 
@@ -135,6 +132,14 @@ export const generateFinancialReport = (
   const accountList = Object.values(accounts);
   const unassignedAccounts: AccountBalance[] = [];
   
+  // Sammle alle vorhandenen Jahre
+  const allYearsSet = new Set<number>();
+  accountList.forEach(acc => {
+    Object.keys(acc.yearlyBalances).forEach(y => allYearsSet.add(parseInt(y)));
+  });
+  // Sortiere Jahre absteigend (aktuellstes zuerst)
+  const years = Array.from(allYearsSet).sort((a, b) => b - a);
+
   // Update Account Names based on mapping
   if (customMapping) {
     Object.keys(customMapping).forEach(accNum => {
@@ -152,6 +157,7 @@ export const generateFinancialReport = (
       id: def.id,
       label: def.label,
       amount: 0,
+      yearlyAmounts: {},
       level: def.parent ? 1 : 0,
       children: [],
       accounts: []
@@ -159,11 +165,10 @@ export const generateFinancialReport = (
   });
 
   accountList.forEach(acc => {
-    if (Math.abs(acc.balance) < 0.01) return;
+    if (Math.abs(acc.balance) < 0.01 && Object.values(acc.yearlyBalances).every(v => Math.abs(v) < 0.01)) return;
 
     const structId = mapAccountToStructure(acc.accountNumber, customMapping);
     
-    // Wenn keine Zuordnung gefunden wurde (z.B. Konto 9000), kommt es in die Fehlerliste
     if (!structId) {
       unassignedAccounts.push(acc);
       return;
@@ -178,46 +183,94 @@ export const generateFinancialReport = (
     const def = structureDefs.find(d => d.id === structId);
     if (!def) return;
     
-    let displayAmount = acc.balance;
+    const displayAccount = { ...acc, yearlyBalances: { ...acc.yearlyBalances } };
+    
+    // Invert logic for Passiva/Ertrag
     if (def.type === 'PASSIVA' || def.type === 'GUV_ERTRAG') {
-      displayAmount = -acc.balance;
+      displayAccount.balance = -displayAccount.balance;
+      years.forEach(y => {
+        if (displayAccount.yearlyBalances[y]) {
+          displayAccount.yearlyBalances[y] = -displayAccount.yearlyBalances[y];
+        }
+      });
     }
 
     item.accounts = item.accounts || [];
-    item.accounts.push({ ...acc, balance: displayAmount });
-    item.amount += displayAmount;
+    item.accounts.push(displayAccount);
+    
+    // Accumulate Item Totals
+    item.amount += displayAccount.balance;
+    years.forEach(y => {
+        item.yearlyAmounts[y] = (item.yearlyAmounts[y] || 0) + (displayAccount.yearlyBalances[y] || 0);
+    });
   });
 
   const rootItems: Record<string, FinancialReportItem> = {};
   let totalProfit = 0;
-  let rawGuvBalance = 0;
+  const yearlyProfits: Record<number, number> = {};
 
+  // Calculate Raw GuV Profits
   structureDefs.forEach(def => {
     if (def.type === 'GUV_ERTRAG' || def.type === 'GUV_AUFWAND') {
         const item = itemMap.get(def.id);
         if (item && item.accounts) {
              item.accounts.forEach(acc => {
                  const isInverted = (def.type === 'GUV_ERTRAG');
-                 const originalBalance = isInverted ? -acc.balance : acc.balance;
-                 rawGuvBalance += originalBalance;
+                 // Original balance needed for profit calc (Earnings - Expenses)
+                 // Note: Account balance is already inverted in loop above if type is PASSIVA/ERTRAG.
+                 // Wait, above we did: displayAccount.balance = -acc.balance for ERTRAG.
+                 // So acc.balance in item.accounts IS POSITIVE for Revenue.
+                 // Profit = Revenue (pos) - Expense (pos).
+                 // But wait, in SKR04: Revenue is Credit (Haben) -> Negative in Excel. 
+                 // We inverted it to display positive.
+                 // Expenses are Debit (Soll) -> Positive in Excel.
+                 // So Profit = DisplayRevenue - DisplayExpense.
+                 
+                 // However, simpler approach: Sum up original raw balances. 
+                 // Revenue (Neg) + Expense (Pos) = Result (Neg = Profit, Pos = Loss).
+                 // We want Profit as positive number usually.
+                 
+                 // Let's use the raw accounts from input to be safe, but we are iterating mapped items.
+                 // Revert the inversion for profit calc:
+                 const displayBal = acc.balance; 
+                 const rawBal = isInverted ? -displayBal : displayBal; // Back to raw
+                 // Actually, let's look at `acc.balance` in `item.accounts`.
+                 // If `def.type === 'GUV_ERTRAG'`, we did `val = -val`.
+                 // So `acc.balance` is positive revenue.
+                 // If `def.type === 'GUV_AUFWAND'`, we did nothing. `acc.balance` is positive expense.
+                 
+                 // Total Profit = Revenue - Expense.
+                 if (def.type === 'GUV_ERTRAG') {
+                     totalProfit += acc.balance;
+                     years.forEach(y => {
+                         yearlyProfits[y] = (yearlyProfits[y] || 0) + (acc.yearlyBalances[y] || 0);
+                     });
+                 } else {
+                     totalProfit -= acc.balance;
+                     years.forEach(y => {
+                         yearlyProfits[y] = (yearlyProfits[y] || 0) - (acc.yearlyBalances[y] || 0);
+                     });
+                 }
              });
         }
     }
   });
-  
-  totalProfit = -rawGuvBalance;
 
   const resultItem = itemMap.get('ek_ergebnis');
   if (resultItem) {
       resultItem.amount = totalProfit;
+      resultItem.yearlyAmounts = yearlyProfits;
+      
       resultItem.accounts = [{
           accountNumber: 'JÜ', 
-          accountName: totalProfit >= 0 ? 'Jahresüberschuss' : 'Jahresfehlbetrag', 
+          accountName: 'Jahresüberschuss / -fehlbetrag', 
           balance: totalProfit, 
+          yearlyBalances: yearlyProfits,
           bookings: []
       }];
   }
 
+  // Build Tree
   structureDefs.forEach(def => {
     const item = itemMap.get(def.id)!;
     if (def.parent) {
@@ -226,39 +279,47 @@ export const generateFinancialReport = (
         parent.children = parent.children || [];
         parent.children.push(item);
         parent.amount += item.amount;
+        years.forEach(y => {
+            parent.yearlyAmounts[y] = (parent.yearlyAmounts[y] || 0) + (item.yearlyAmounts[y] || 0);
+        });
       }
     } else {
       rootItems[def.id] = item;
     }
   });
 
-  const calculateTotals = (item: FinancialReportItem): number => {
+  const calculateTotals = (item: FinancialReportItem): void => {
       if (item.children && item.children.length > 0) {
-          const childrenSum = item.children.reduce((acc, child) => acc + calculateTotals(child), 0);
-          const ownAccountsSum = item.accounts ? item.accounts.reduce((a, b) => a + b.balance, 0) : 0;
-          item.amount = childrenSum + ownAccountsSum;
-          return item.amount;
+          let sum = 0;
+          const yearSums: Record<number, number> = {};
+          
+          item.children.forEach(child => {
+              calculateTotals(child);
+              sum += child.amount;
+              years.forEach(y => {
+                  yearSums[y] = (yearSums[y] || 0) + (child.yearlyAmounts[y] || 0);
+              });
+          });
+          
+          // Add own accounts if any (usually root nodes don't have accounts directly, but hybrids might)
+          if (item.accounts) {
+             item.accounts.forEach(acc => {
+                 sum += acc.balance;
+                 years.forEach(y => {
+                    yearSums[y] = (yearSums[y] || 0) + (acc.yearlyBalances[y] || 0);
+                 });
+             });
+          }
+
+          item.amount = sum;
+          item.yearlyAmounts = yearSums;
       }
-      return item.amount;
   };
 
   Object.values(rootItems).forEach(root => calculateTotals(root));
 
-  // Check Logic:
-  // Aktiva = Positiv
-  // Passiva = Positiv (dargestellt), aber logisch Haben.
-  // Wenn Konto 9000 (Soll 500) fehlt, dann fehlt es in Aktiva oder Passiva.
-  // Double Entry Check: Summe aller Balances muss 0 sein.
-  // Wenn unassignedAccounts Balances haben, ist Summe der zugewiesenen != 0.
-  
   const aktivaSum = rootItems['aktiva_root'].amount;
   const passivaSum = rootItems['passiva_root'].amount;
-  
-  // Diff ist normalerweise (Aktiva - Passiva). 
-  // Da Passiva hier als positiver Wert angezeigt wird (z.B. 1000 Aktiva, 1000 Passiva),
-  // ist die Differenz Aktiva - Passiva.
-  // Wenn Konto 9000 (Soll 100) unassigned ist, fehlt es bei Aktiva (theoretisch) oder bläht Passiva nicht auf.
-  // Summe aller Accounts + Unassigned = 0.
   
   return {
     guv: rootItems['guv_root'],
@@ -273,6 +334,8 @@ export const generateFinancialReport = (
     unassigned: unassignedAccounts,
     accounts: accounts,
     journal: [],
-    profit: totalProfit
+    profit: totalProfit,
+    yearlyProfits: yearlyProfits,
+    years: years
   };
 };

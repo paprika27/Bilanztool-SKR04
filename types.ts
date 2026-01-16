@@ -2,6 +2,7 @@ export interface Booking {
   id: string;
   date: string; // Formatiertes Datum
   rawDate: number; // Excel Serial Date für Sortierung
+  year: number; // NEU: Jahr der Buchung
   beleg1: string;
   beleg2: string;
   text: string;
@@ -14,7 +15,8 @@ export interface Booking {
 export interface AccountBalance {
   accountNumber: string;
   accountName: string;
-  balance: number; // Positive = Soll-Lastig (Aktiva/Aufwand), Negative = Haben-Lastig (Passiva/Ertrag)
+  balance: number; // Gesamtsaldo (Legacy/Aktuelles Jahr)
+  yearlyBalances: Record<number, number>; // NEU: Saldo pro Jahr
   bookings: Booking[];
 }
 
@@ -23,7 +25,8 @@ export type AccountType = 'AKTIVA' | 'PASSIVA' | 'AUFWAND' | 'ERTRAG' | 'UNASSIG
 export interface FinancialReportItem {
   id: string;
   label: string;
-  amount: number;
+  amount: number; // Gesamtsaldo (Legacy/Aktuelles Jahr)
+  yearlyAmounts: Record<number, number>; // NEU: Saldo pro Jahr
   level: number;
   children?: FinancialReportItem[];
   accounts?: AccountBalance[];
@@ -39,17 +42,18 @@ export interface FinancialData {
       balanced: boolean;
     };
   };
-  unassigned: AccountBalance[]; // NEU: Konten die nirgendwo hin passen (z.B. 9000 mit Saldo)
+  unassigned: AccountBalance[];
   journal: Booking[];
   accounts: Record<string, AccountBalance>;
-  profit: number;
+  profit: number; // Legacy
+  yearlyProfits: Record<number, number>; // NEU
+  years: number[]; // Liste der verfügbaren Jahre (sortiert absteigend)
 }
 
-// Neu für Mapping
 export interface CustomAccountMapping {
   [accountNumber: string]: {
     name?: string;
-    structureId?: string; // ID aus structureDefs
+    structureId?: string; 
   };
 }
 
@@ -59,4 +63,11 @@ export interface StructureDefinition {
   parent?: string;
   type: 'AKTIVA' | 'PASSIVA' | 'GUV_ERTRAG' | 'GUV_AUFWAND' | 'ROOT';
   order: number;
+}
+
+export interface KPIDefinition {
+  id: string;
+  label: string;
+  formula: string; // z.B. "{{umsatz}} - {{personal}}"
+  format: 'currency' | 'percent' | 'number';
 }

@@ -34,12 +34,14 @@ const normAcc = (val: any): string => {
 };
 
 // Excel Serial Date to JS Date String (DD.MM.YYYY)
-const parseDate = (val: any): { display: string, raw: number } => {
-  if (!val) return { display: '', raw: 0 };
+const parseDate = (val: any): { display: string, raw: number, year: number } => {
+  if (!val) return { display: '', raw: 0, year: 0 };
   
   // Wenn es bereits ein String ist (z.B. "01.01.2024")
   if (typeof val === 'string' && val.includes('.')) {
-    return { display: val, raw: 0 }; 
+    const parts = val.split('.');
+    const year = parts.length === 3 ? parseInt(parts[2]) : 0;
+    return { display: val, raw: 0, year }; 
   }
 
   // Excel Serial Date
@@ -54,13 +56,13 @@ const parseDate = (val: any): { display: string, raw: number } => {
     const month = String(date_info.getMonth() + 1).padStart(2, '0');
     const year = date_info.getFullYear();
     
-    return { display: `${day}.${month}.${year}`, raw: serial };
+    return { display: `${day}.${month}.${year}`, raw: serial, year };
   }
   
-  return { display: String(val), raw: 0 };
+  return { display: String(val), raw: 0, year: 0 };
 };
 
-export const parseExcelFile = async (file: File): Promise<{ bookings: Booking[], accounts: Record<string, AccountBalance> }> => {
+export const parseExcelFile = async (file: File, idPrefix: string = ''): Promise<{ bookings: Booking[], accounts: Record<string, AccountBalance> }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -81,8 +83,9 @@ export const parseExcelFile = async (file: File): Promise<{ bookings: Booking[],
           if (!accounts[id]) {
             accounts[id] = {
               accountNumber: id,
-              accountName: `Konto ${id}`, // Default name, could be enriched with mapping
+              accountName: `Konto ${id}`,
               balance: 0,
+              yearlyBalances: {},
               bookings: []
             };
           }
@@ -118,10 +121,14 @@ export const parseExcelFile = async (file: File): Promise<{ bookings: Booking[],
           const gegenkonto = normAcc(row[kGegen!] || '');
           const dateObj = parseDate(row[kDatum!]);
 
+          // ID muss bei Append unique sein
+          const uniqueId = idPrefix ? `${idPrefix}-row-${rowIdx}` : `row-${rowIdx}`;
+
           const booking: Booking = {
-            id: `row-${rowIdx}`,
+            id: uniqueId,
             date: dateObj.display,
             rawDate: dateObj.raw,
+            year: dateObj.year,
             text: String(row[kText!] || ''),
             beleg1: String(row[kBeleg1!] || ''),
             beleg2: '',
@@ -135,19 +142,24 @@ export const parseExcelFile = async (file: File): Promise<{ bookings: Booking[],
 
           // Update Account Balances
           const mainAcc = getAccount(konto);
-          mainAcc.balance += (soll - haben);
+          const val = soll - haben;
+          mainAcc.balance += val;
+          mainAcc.yearlyBalances[booking.year] = (mainAcc.yearlyBalances[booking.year] || 0) + val;
           mainAcc.bookings.push(booking);
 
           if (gegenkonto && gegenkonto !== '0') {
             const contraAcc = getAccount(gegenkonto);
             const contraSoll = haben; 
             const contraHaben = soll;
-            contraAcc.balance += (contraSoll - contraHaben);
+            const contraVal = contraSoll - contraHaben;
+            
+            contraAcc.balance += contraVal;
+            contraAcc.yearlyBalances[booking.year] = (contraAcc.yearlyBalances[booking.year] || 0) + contraVal;
             
             // Add a mirror booking for reference
             contraAcc.bookings.push({
               ...booking,
-              id: `row-${rowIdx}-mirror`,
+              id: `${uniqueId}-mirror`,
               konto: gegenkonto,
               gegenkonto: konto,
               soll: contraSoll,
