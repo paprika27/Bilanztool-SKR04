@@ -7,64 +7,9 @@ import { Download, Upload, Plus, Trash2, Calculator, Info, Hash, FolderTree, Gri
 interface Props {
   data: FinancialData;
   years: number[];
+  kpis: KPIDefinition[];
+  setKpis: React.Dispatch<React.SetStateAction<KPIDefinition[]>>;
 }
-
-const DEFAULT_KPIS: KPIDefinition[] = [
-  { 
-    id: 'ebit', 
-    label: 'EBIT (Näherung)', 
-    formula: '{{ek_ergebnis}} + {{steuern_er}} + {{steuern_sonst}} + {{zinsen}}', 
-    format: 'currency' 
-  },
-  { 
-    id: 'pers_quote', 
-    label: 'Personalquote', 
-    formula: '({{personal}} / {{umsatz}}) * 100', 
-    format: 'percent' 
-  },
-  { 
-    id: 'rohertrag', 
-    label: 'Rohertrag', 
-    formula: '{{umsatz}} - {{material}} - {{bestandsva}}', 
-    format: 'currency' 
-  },
-  { 
-    id: 'anlageintens', 
-    label: 'Anlageintensität', 
-    formula: '({{av}} / {{aktiva_root}}) * 100', 
-    format: 'percent' 
-  },
-  { 
-    id: 'liquid_mittel_quote', 
-    label: 'Quote liquider Mittel', 
-    formula: '({{uv_kasse}} / {{aktiva_root}}) * 100', 
-    format: 'percent' 
-  },
-  { 
-    id: 'ek_quote', 
-    label: 'Eigenkapitalquote', 
-    formula: '({{ek}} / {{passiva_root}}) * 100', 
-    format: 'percent' 
-  },
-  { 
-    id: 'verschuldung', 
-    label: 'Verschuldungsgrad (Fremd/Eigen)', 
-    formula: '(({{passiva_root}} - {{ek}}) / {{ek}}) * 100', 
-    format: 'percent' 
-  },
-  { 
-    id: 'erfolgsquote', 
-    label: 'Umsatzrentabilität (Erfolgsquote)', 
-    formula: '({{ek_ergebnis}} / {{umsatz}}) * 100', 
-    format: 'percent' 
-  },
-  { 
-    id: 'liq_1', 
-    label: 'Liquidität 1. Grades (Cash Ratio)', 
-    formula: '({{uv_kasse}} / {{verb}}) * 100', 
-    format: 'percent' 
-  }
-];
 
 interface Suggestion {
   id: string;
@@ -72,9 +17,7 @@ interface Suggestion {
   type: 'structure' | 'account';
 }
 
-const KPIBoard: React.FC<Props> = ({ data, years }) => {
-  const [kpis, setKpis] = useState<KPIDefinition[]>(DEFAULT_KPIS);
-  
+const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
   // Drag and Drop State
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -100,12 +43,18 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
   }, [data]);
 
   const filteredSuggestions = useMemo(() => {
-    if (!suggestionQuery) return [];
+    if (!activeKpiId) return [];
+    
+    // If the user just typed '{{', query is empty but we should show suggestions
+    if (suggestionQuery === '') {
+        return allSuggestions.slice(0, 50); // Show top 50 matches initially
+    }
+
     const q = suggestionQuery.toLowerCase();
     return allSuggestions
       .filter(s => s.id.toLowerCase().includes(q) || s.label.toLowerCase().includes(q))
-      .slice(0, 10); // Limit to 10 results
-  }, [allSuggestions, suggestionQuery]);
+      .slice(0, 10);
+  }, [allSuggestions, suggestionQuery, activeKpiId]);
 
   const handleInputCheck = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
       const val = e.target.value;
@@ -114,8 +63,8 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
       setCursorPos(pos);
       setActiveKpiId(id);
 
-      // Check if we are typing a variable: looks like ... {{something
       const textBeforeCursor = val.slice(0, pos);
+      // Regex modified: matches {{ followed by anything (including empty string) until end of string or closing brace
       const match = textBeforeCursor.match(/\{\{([^}]*)$/);
       
       if (match) {
@@ -274,6 +223,8 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
     performDrop(index);
   };
 
+  const structureVars = structureDefs.filter(d => d.type !== 'ROOT').map(d => ({ id: d.id, label: d.label }));
+
   return (
     <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-gray-800">
       <div className="flex justify-between items-center mb-6">
@@ -297,10 +248,17 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
 
       <div className="mb-6 p-4 bg-blue-50 text-sm text-blue-800 rounded-lg flex items-start gap-3">
          <Info className="flex-shrink-0 mt-0.5" size={18} />
-         <div>
+         <div className="w-full">
             <p className="font-semibold mb-1">Formel-Hilfe:</p>
-            <p>Tippen Sie <code>{'{{'}</code> um Werte aus der Bilanz/GuV oder Konten auszuwählen.</p>
-            <p className="mt-1">Beispiele: <code>{'{{umsatz}}'}</code>, <code>{'{{personal}}'}</code>, <code>{'{{4110}}'}</code>.</p>
+            <p className="mb-2">Tippen Sie <code>{'{{'}</code> um Werte auszuwählen. Verfügbare Variablen:</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 max-h-32 overflow-y-auto bg-blue-100/50 p-2 rounded border border-blue-200 text-xs font-mono">
+                {structureVars.map(v => (
+                    <div key={v.id} className="truncate" title={v.label}>
+                        <span className="font-bold">{`{{${v.id}}}`}</span> <span className="text-blue-600/70">- {v.label}</span>
+                    </div>
+                ))}
+            </div>
+            <p className="mt-2 text-xs text-blue-600">Zusätzlich können alle Kontonummern verwendet werden (z.B. <code>{'{{4400}}'}</code>).</p>
          </div>
       </div>
 
@@ -323,6 +281,7 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
             {kpis.map((kpi, index) => {
               const isDragging = draggedIdx === index;
               const isDraggedOver = dragOverIdx === index;
+              const isActive = activeKpiId === kpi.id;
               
               // Calculate visual offset
               let transformStyle = {};
@@ -341,10 +300,13 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
                        }
                   }
               }
+              
+              // Z-Index Logic: Active row gets super high index to float dropdown over subsequent rows
+              const zIndexStyle = { zIndex: isActive ? 50 : 10 };
 
               // Apply transition to content Wrapper DIV, NOT the TD itself.
               // This ensures the TD remains in place as a hit target for the drop event.
-              const wrapperClass = `border-b border-gray-100 transition-transform duration-300 ease-in-out bg-white ${opacityClass} relative z-10 w-full h-full flex items-center`;
+              const wrapperClass = `border-b border-gray-100 transition-transform duration-300 ease-in-out bg-white ${opacityClass} relative w-full h-full flex items-center`;
 
               return (
               <tr 
@@ -355,7 +317,7 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
               >
                 {/* Drag Handle Column */}
                 <td className="p-0 border-b-0 align-top h-1">
-                    <div className={`${wrapperClass} py-4 px-2 justify-center`} style={transformStyle}>
+                    <div className={`${wrapperClass} py-4 px-2 justify-center`} style={{...transformStyle, ...zIndexStyle}}>
                         <div 
                         draggable
                         onDragStart={(e) => onDragStart(e, index)}
@@ -368,7 +330,7 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
                 </td>
                 
                 <td className="p-0 border-b-0 align-top h-1">
-                   <div className={`${wrapperClass} py-4 pl-2 block`} style={transformStyle}>
+                   <div className={`${wrapperClass} py-4 pl-2 block`} style={{...transformStyle, ...zIndexStyle}}>
                         <div className="space-y-2 relative w-full">
                             <input 
                                 type="text" 
@@ -395,19 +357,20 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
                                     <option value="number">#</option>
                                 </select>
 
-                                {activeKpiId === kpi.id && filteredSuggestions.length > 0 && (
-                                    <div className="absolute top-full left-0 mt-1 w-full max-w-md bg-white border border-gray-200 rounded shadow-lg z-20 max-h-60 overflow-y-auto">
+                                {isActive && filteredSuggestions.length > 0 && (
+                                    <div className="absolute top-full left-0 mt-1 w-full max-w-md bg-white border border-gray-200 rounded shadow-xl z-[100] max-h-60 overflow-y-auto">
                                         {filteredSuggestions.map(s => (
                                             <div 
                                                 key={s.id} 
-                                                className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center justify-between group/item"
+                                                className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center justify-between group/item border-b border-gray-50 last:border-0"
                                                 onClick={() => handleSuggestionClick(s, kpi.id, kpi.formula)}
+                                                onMouseDown={(e) => e.preventDefault()} // Prevent blur before click
                                             >
                                                 <div className="flex items-center gap-2 overflow-hidden">
-                                                    {s.type === 'structure' ? <FolderTree size={14} className="text-blue-500" /> : <Hash size={14} className="text-gray-400" />}
+                                                    {s.type === 'structure' ? <FolderTree size={14} className="text-blue-500 flex-shrink-0" /> : <Hash size={14} className="text-gray-400 flex-shrink-0" />}
                                                     <span className="font-medium text-gray-800 truncate">{s.label}</span>
                                                 </div>
-                                                <span className="text-xs font-mono text-gray-400 bg-gray-50 px-1 rounded">{s.id}</span>
+                                                <span className="text-xs font-mono text-gray-400 bg-gray-50 px-1 rounded ml-2 whitespace-nowrap">{s.id}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -424,13 +387,13 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
                     return (
                         <React.Fragment key={y}>
                             <td className="p-0 border-b-0 align-top h-1">
-                                <div className={`${wrapperClass} py-4 px-2 justify-end font-mono text-base font-medium text-gray-900 tabular-nums`} style={transformStyle}>
+                                <div className={`${wrapperClass} py-4 px-2 justify-end font-mono text-base font-medium text-gray-900 tabular-nums`} style={{...transformStyle, ...zIndexStyle}}>
                                     {formatValue(res, kpi.format)}
                                 </div>
                             </td>
                             {prevRes !== null && (
                                 <td className="p-0 border-b-0 align-top h-1">
-                                    <div className={`${wrapperClass} py-4 px-0 justify-center`} style={transformStyle}>
+                                    <div className={`${wrapperClass} py-4 px-0 justify-center`} style={{...transformStyle, ...zIndexStyle}}>
                                         <DynamicTrendIcon current={res || 0} prev={prevRes || 0} />
                                     </div>
                                 </td>
@@ -439,7 +402,7 @@ const KPIBoard: React.FC<Props> = ({ data, years }) => {
                     );
                 })}
                 <td className="p-0 border-b-0 align-top h-1">
-                    <div className={`${wrapperClass} py-4 px-2 justify-end`} style={transformStyle}>
+                    <div className={`${wrapperClass} py-4 px-2 justify-end`} style={{...transformStyle, ...zIndexStyle}}>
                         <button onClick={() => deleteKPI(kpi.id)} className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-gray-100 transition-colors">
                             <Trash2 size={16} />
                         </button>

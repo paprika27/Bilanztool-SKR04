@@ -7,7 +7,64 @@ import AccountManager from './components/AccountManager';
 import KPIBoard from './components/KPIBoard';
 import { parseExcelFile } from './services/excelService';
 import { generateFinancialReport } from './services/skr04Service';
-import { FinancialData, AccountBalance, CustomAccountMapping, Booking } from './types';
+import { FinancialData, AccountBalance, CustomAccountMapping, Booking, KPIDefinition } from './types';
+
+const DEFAULT_KPIS: KPIDefinition[] = [
+  { 
+    id: 'ebit', 
+    label: 'EBIT (Näherung)', 
+    formula: '{{ek_ergebnis}} + {{steuern_er}} + {{steuern_sonst}} + {{zinsen}}', 
+    format: 'currency' 
+  },
+  { 
+    id: 'pers_quote', 
+    label: 'Personalquote', 
+    formula: '({{personal}} / {{umsatz}}) * 100', 
+    format: 'percent' 
+  },
+  { 
+    id: 'rohertrag', 
+    label: 'Rohertrag', 
+    formula: '{{umsatz}} - {{material}} - {{bestandsva}}', 
+    format: 'currency' 
+  },
+  { 
+    id: 'anlageintens', 
+    label: 'Anlageintensität', 
+    formula: '({{av}} / {{aktiva_root}}) * 100', 
+    format: 'percent' 
+  },
+  { 
+    id: 'liquid_mittel_quote', 
+    label: 'Quote liquider Mittel', 
+    formula: '({{uv_kasse}} / {{aktiva_root}}) * 100', 
+    format: 'percent' 
+  },
+  { 
+    id: 'ek_quote', 
+    label: 'Eigenkapitalquote', 
+    formula: '({{ek}} / {{passiva_root}}) * 100', 
+    format: 'percent' 
+  },
+  { 
+    id: 'verschuldung', 
+    label: 'Verschuldungsgrad (Fremd/Eigen)', 
+    formula: '(({{passiva_root}} - {{ek}}) / {{ek}}) * 100', 
+    format: 'percent' 
+  },
+  { 
+    id: 'erfolgsquote', 
+    label: 'Umsatzrentabilität (Erfolgsquote)', 
+    formula: '({{ek_ergebnis}} / {{umsatz}}) * 100', 
+    format: 'percent' 
+  },
+  { 
+    id: 'liq_1', 
+    label: 'Liquidität 1. Grades (Cash Ratio)', 
+    formula: '({{uv_kasse}} / {{verb}}) * 100', 
+    format: 'percent' 
+  }
+];
 
 const App: React.FC = () => {
   const [data, setData] = useState<FinancialData | null>(null);
@@ -23,6 +80,9 @@ const App: React.FC = () => {
   
   // State für Custom Mappings
   const [customMapping, setCustomMapping] = useState<CustomAccountMapping>({});
+  
+  // State für KPIs (Lifted State)
+  const [kpis, setKpis] = useState<KPIDefinition[]>(DEFAULT_KPIS);
 
   // Trigger Report Generation
   const refreshReport = (accounts: Record<string, AccountBalance>) => {
@@ -72,10 +132,6 @@ const App: React.FC = () => {
         setRawBookings(currentBookings);
         
         if (mode === 'replace') setActiveTab('BILANZ');
-        const msg = files.length > 1 
-            ? `${files.length} Dateien erfolgreich verarbeitet.` 
-            : 'Datei erfolgreich verarbeitet.';
-        // alert(msg); // Optional: Alert removal for smoother UX
 
     } catch (e) {
       console.error(e);
@@ -98,6 +154,7 @@ const App: React.FC = () => {
       setRawAccounts({});
       setRawBookings([]);
       setCustomMapping({});
+      setKpis(DEFAULT_KPIS);
       setActiveTab('BILANZ');
   };
 
@@ -345,7 +402,12 @@ const App: React.FC = () => {
               
               {/* KPI VIEW */}
               {activeTab === 'KPI' && (
-                  <KPIBoard data={data} years={data.years} />
+                  <KPIBoard 
+                    data={data} 
+                    years={data.years}
+                    kpis={kpis}
+                    setKpis={setKpis}
+                  />
               )}
 
               {/* SALDEN VIEW */}
