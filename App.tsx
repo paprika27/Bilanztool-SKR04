@@ -372,7 +372,7 @@ const App: React.FC = () => {
                    <div className="min-w-max">
                         <h2 className="hidden print:block text-xl font-bold mb-4">Gewinn- und Verlustrechnung</h2>
                         
-                        <div className="flex justify-between items-center mb-6 bg-slate-50 p-4 rounded border print:border-gray-300 min-w-max">
+                        <div className="flex justify-between items-center mb-6 bg-slate-50 p-4 rounded border print:border-gray-300 min-w-max print:hidden">
                             <span className="font-medium text-gray-700 mr-8">Jahresergebnis</span>
                             <div className="flex gap-8">
                                 {data.years.map(y => (
@@ -401,14 +401,14 @@ const App: React.FC = () => {
               </div>
               
               {/* KPI VIEW */}
-              {activeTab === 'KPI' && (
+              <div className={activeTab === 'KPI' ? 'block' : 'hidden print:block print:break-before-page'}>
                   <KPIBoard 
                     data={data} 
                     years={data.years}
                     kpis={kpis}
                     setKpis={setKpis}
                   />
-              )}
+              </div>
 
               {/* SALDEN VIEW */}
               {activeTab === 'SALDEN' && (

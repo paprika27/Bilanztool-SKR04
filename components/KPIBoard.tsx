@@ -226,13 +226,13 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
   const structureVars = structureDefs.filter(d => d.type !== 'ROOT').map(d => ({ id: d.id, label: d.label }));
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-gray-800">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-gray-800 print:shadow-none print:border-0 print:p-0">
+      <div className="flex justify-between items-center mb-6 print:mb-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
-          <Calculator className="text-blue-600" /> 
+          <Calculator className="text-blue-600 print:hidden" /> 
           KPI Dashboard
         </h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 print:hidden">
            <button onClick={addKPI} className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">
              <Plus size={16} /> Neu
            </button>
@@ -246,19 +246,19 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
         </div>
       </div>
 
-      <div className="mb-6 p-4 bg-blue-50 text-sm text-blue-800 rounded-lg flex items-start gap-3">
-         <Info className="flex-shrink-0 mt-0.5" size={18} />
+      <div className="mb-6 p-4 bg-blue-50 text-sm text-blue-800 rounded-lg flex items-start gap-3 print:bg-transparent print:p-0 print:block">
+         <Info className="flex-shrink-0 mt-0.5 print:hidden" size={18} />
          <div className="w-full">
-            <p className="font-semibold mb-1">Formel-Hilfe:</p>
-            <p className="mb-2">Tippen Sie <code>{'{{'}</code> um Werte auszuwählen. Verfügbare Variablen:</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 max-h-32 overflow-y-auto bg-blue-100/50 p-2 rounded border border-blue-200 text-xs font-mono">
+            <p className="font-semibold mb-1 print:hidden">Formel-Hilfe:</p>
+            <p className="mb-2 print:hidden">Tippen Sie <code>{'{{'}</code> um Werte auszuwählen. Verfügbare Variablen:</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 max-h-32 overflow-y-auto bg-blue-100/50 p-2 rounded border border-blue-200 text-xs font-mono print:max-h-none print:overflow-visible print:border-0 print:bg-transparent print:p-0">
                 {structureVars.map(v => (
                     <div key={v.id} className="truncate" title={v.label}>
-                        <span className="font-bold">{`{{${v.id}}}`}</span> <span className="text-blue-600/70">- {v.label}</span>
+                        <span className="font-bold">{`{{${v.id}}}`}</span> <span className="text-blue-600/70 print:text-gray-600">- {v.label}</span>
                     </div>
                 ))}
             </div>
-            <p className="mt-2 text-xs text-blue-600">Zusätzlich können alle Kontonummern verwendet werden (z.B. <code>{'{{4400}}'}</code>).</p>
+            <p className="mt-2 text-xs text-blue-600 print:hidden">Zusätzlich können alle Kontonummern verwendet werden (z.B. <code>{'{{4400}}'}</code>).</p>
          </div>
       </div>
 
@@ -266,7 +266,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
         <table className="w-full text-sm text-left border-separate border-spacing-0">
           <thead>
             <tr className="text-gray-500">
-              <th className="py-3 px-2 w-8 border-b-2 border-gray-200"></th>
+              <th className="py-3 px-2 w-8 border-b-2 border-gray-200 print:hidden"></th>
               <th className="py-3 pl-2 w-1/3 border-b-2 border-gray-200">Kennzahl / Formel</th>
               {years.map((year, idx) => (
                 <React.Fragment key={year}>
@@ -274,7 +274,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                     {years[idx+1] && <th className="py-3 px-2 w-8 border-b-2 border-gray-200"></th>}
                 </React.Fragment>
               ))}
-              <th className="py-3 px-2 w-10 border-b-2 border-gray-200"></th>
+              <th className="py-3 px-2 w-10 border-b-2 border-gray-200 print:hidden"></th>
             </tr>
           </thead>
           <tbody>
@@ -301,12 +301,10 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                   }
               }
               
-              // Z-Index Logic: Active row gets super high index to float dropdown over subsequent rows
               const zIndexStyle = { zIndex: isActive ? 50 : 10 };
 
               // Apply transition to content Wrapper DIV, NOT the TD itself.
-              // This ensures the TD remains in place as a hit target for the drop event.
-              const wrapperClass = `border-b border-gray-100 transition-transform duration-300 ease-in-out bg-white ${opacityClass} relative w-full h-full flex items-center`;
+              const wrapperClass = `border-b border-gray-100 transition-transform duration-300 ease-in-out bg-white ${opacityClass} relative w-full h-full flex items-center print:border-gray-200`;
 
               return (
               <tr 
@@ -316,7 +314,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                 onDrop={(e) => onDropRow(e, index)}
               >
                 {/* Drag Handle Column */}
-                <td className="p-0 border-b-0 align-top h-1">
+                <td className="p-0 border-b-0 align-top h-1 print:hidden">
                     <div className={`${wrapperClass} py-4 px-2 justify-center`} style={{...transformStyle, ...zIndexStyle}}>
                         <div 
                         draggable
@@ -331,7 +329,8 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                 
                 <td className="p-0 border-b-0 align-top h-1">
                    <div className={`${wrapperClass} py-4 pl-2 block`} style={{...transformStyle, ...zIndexStyle}}>
-                        <div className="space-y-2 relative w-full">
+                        {/* Interactive Edit View */}
+                        <div className="space-y-2 relative w-full print:hidden">
                             <input 
                                 type="text" 
                                 value={kpi.label} 
@@ -364,7 +363,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                                                 key={s.id} 
                                                 className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center justify-between group/item border-b border-gray-50 last:border-0"
                                                 onClick={() => handleSuggestionClick(s, kpi.id, kpi.formula)}
-                                                onMouseDown={(e) => e.preventDefault()} // Prevent blur before click
+                                                onMouseDown={(e) => e.preventDefault()}
                                             >
                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                     {s.type === 'structure' ? <FolderTree size={14} className="text-blue-500 flex-shrink-0" /> : <Hash size={14} className="text-gray-400 flex-shrink-0" />}
@@ -375,6 +374,17 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* Print View: Clean text output */}
+                        <div className="hidden print:block w-full">
+                            <div className="font-bold text-gray-900 text-lg">{kpi.label}</div>
+                            <div className="text-sm font-mono text-gray-600 mt-1">
+                                {kpi.formula} 
+                                <span className="ml-2 text-xs border border-gray-200 bg-gray-50 px-1 rounded text-gray-500">
+                                    {kpi.format === 'currency' ? 'EUR' : kpi.format === 'percent' ? '%' : '#'}
+                                </span>
                             </div>
                         </div>
                    </div>
@@ -401,7 +411,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                         </React.Fragment>
                     );
                 })}
-                <td className="p-0 border-b-0 align-top h-1">
+                <td className="p-0 border-b-0 align-top h-1 print:hidden">
                     <div className={`${wrapperClass} py-4 px-2 justify-end`} style={{...transformStyle, ...zIndexStyle}}>
                         <button onClick={() => deleteKPI(kpi.id)} className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-gray-100 transition-colors">
                             <Trash2 size={16} />
