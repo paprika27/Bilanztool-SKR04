@@ -371,20 +371,6 @@ const App: React.FC = () => {
                 <div className="p-6 w-full print:max-w-none print:p-8 overflow-x-auto">
                    <div className="min-w-max">
                         <h2 className="hidden print:block text-xl font-bold mb-4">Gewinn- und Verlustrechnung</h2>
-                        
-                        <div className="flex justify-between items-center mb-6 bg-slate-50 p-4 rounded border print:border-gray-300 min-w-max print:hidden">
-                            <span className="font-medium text-gray-700 mr-8">Jahresergebnis</span>
-                            <div className="flex gap-8">
-                                {data.years.map(y => (
-                                    <div key={y} className="text-right w-32">
-                                        <div className="text-xs text-gray-500 mb-1">{y}</div>
-                                        <div className={`text-xl font-bold ${data.yearlyProfits[y] >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {data.yearlyProfits[y].toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
 
                         <div className="mb-2">
                             <HeaderColumns />
@@ -396,12 +382,29 @@ const App: React.FC = () => {
                             forceExpanded={isPrinting || expandAll}
                             years={data.years}
                         />
+
+                        {/* Jahresergebnis Footer */}
+                        <div className="flex justify-between items-center mt-8 pt-4 border-t-2 border-gray-200 bg-slate-50 p-4 rounded print:bg-transparent print:border-gray-800 min-w-max print:break-inside-avoid">
+                            <span className="font-bold text-gray-900 text-lg mr-8">Jahresergebnis</span>
+                            <div className="flex gap-8">
+                                {data.years.map(y => (
+                                    <div key={y} className="text-right w-32">
+                                        <div className={`text-xl font-bold ${data.yearlyProfits[y] >= 0 ? 'text-green-600 print:text-black' : 'text-red-600 print:text-black'}`}>
+                                            {data.yearlyProfits[y].toLocaleString('de-DE', {style:'currency', currency:'EUR'})}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                    </div>
                 </div>
               </div>
               
               {/* KPI VIEW */}
-              <div className={activeTab === 'KPI' ? 'block' : 'hidden print:block print:break-before-page'}>
+              <div 
+                  className={activeTab === 'KPI' ? 'block' : 'hidden print:block'} 
+                  style={{ pageBreakBefore: 'always' }}
+              >
                   <KPIBoard 
                     data={data} 
                     years={data.years}
