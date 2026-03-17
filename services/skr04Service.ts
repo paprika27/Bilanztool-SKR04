@@ -164,26 +164,22 @@ export const generateFinancialReport = (
     });
   });
 
-  accountList.forEach(acc => {
-    if (Math.abs(acc.balance) < 0.01 && Object.values(acc.yearlyBalances).every(v => Math.abs(v) < 0.01)) return;
-
-    const structId = mapAccountToStructure(acc.accountNumber, customMapping);
-    
+  const assignAccountToStructure = (account: AccountBalance, structId: string | null) => {
     if (!structId) {
-      unassignedAccounts.push(acc);
+      unassignedAccounts.push(account);
       return;
     }
 
     const item = itemMap.get(structId);
     if (!item) {
-      unassignedAccounts.push(acc);
+      unassignedAccounts.push(account);
       return;
     }
 
     const def = structureDefs.find(d => d.id === structId);
     if (!def) return;
     
-    const displayAccount = { ...acc, yearlyBalances: { ...acc.yearlyBalances } };
+    const displayAccount = { ...account, yearlyBalances: { ...account.yearlyBalances } };
     
     // Invert logic for Passiva/Ertrag
     if (def.type === 'PASSIVA' || def.type === 'GUV_ERTRAG') {
@@ -203,6 +199,88 @@ export const generateFinancialReport = (
     years.forEach(y => {
         item.yearlyAmounts[y] = (item.yearlyAmounts[y] || 0) + (displayAccount.yearlyBalances[y] || 0);
     });
+  };
+
+  accountList.forEach(acc => {
+    if (Math.abs(acc.balance) < 0.01 && Object.values(acc.yearlyBalances).every(v => Math.abs(v) < 0.01)) return;
+
+    const num = parseInt(acc.accountNumber, 10);
+    const isPersonenkonto = !isNaN(num) && num >= 10000 && num <= 99999;
+    const hasCustomMapping = customMapping && customMapping[acc.accountNumber] && customMapping[acc.accountNumber].structureId;
+
+    if (isPersonenkonto && !hasCustomMapping) {
+      const fordBalances: Record<number, number> = {};
+      const verbBalances: Record<number, number> = {};
+      let hasFord = false;
+      let hasVerb = false;
+      let fordTotal = 0;
+      let verbTotal = 0;
+
+      years.forEach(y => {
+        const bal = acc.yearlyBalances[y] || 0;
+        // Positive balance -> Forderung (Receivable)
+        // Negative balance -> Verbindlichkeit (Liability)
+        if (bal > 0.01) {
+          fordBalances[y] = bal;
+          fordTotal += bal;
+          hasFord = true;
+        } else if (bal < -0.01) {
+          verbBalances[y] = bal;
+          verbTotal += bal;
+          hasVerb = true;
+        }
+      });
+
+      if (years.length === 0) {
+        if (acc.balance > 0.01) {
+          fordTotal = acc.balance;
+          hasFord = true;
+        } else if (acc.balance < -0.01) {
+          verbTotal = acc.balance;
+          hasVerb = true;
+        }
+      }
+
+      const fordBookings = acc.bookings.filter(b => {
+        if (years.length === 0) return hasFord;
+        const bal = acc.yearlyBalances[b.year] || 0;
+        return bal >= -0.01; // Include 0 balances in Ford by default, or just positive
+      });
+
+      const verbBookings = acc.bookings.filter(b => {
+        if (years.length === 0) return hasVerb;
+        const bal = acc.yearlyBalances[b.year] || 0;
+        return bal <= 0.01; // Include 0 balances in Verb by default, or just negative
+      });
+
+      if (hasFord) {
+        const accFord: AccountBalance = {
+          ...acc,
+          balance: fordTotal,
+          yearlyBalances: fordBalances,
+          bookings: fordBookings,
+        };
+        assignAccountToStructure(accFord, 'uv_ford');
+      }
+      if (hasVerb) {
+        const accVerb: AccountBalance = {
+          ...acc,
+          balance: verbTotal,
+          yearlyBalances: verbBalances,
+          bookings: verbBookings,
+        };
+        assignAccountToStructure(accVerb, 'verb');
+      }
+      
+      if (!hasFord && !hasVerb) {
+        assignAccountToStructure(acc, num < 70000 ? 'uv_ford' : 'verb');
+      }
+      
+      return;
+    }
+
+    const structId = mapAccountToStructure(acc.accountNumber, customMapping);
+    assignAccountToStructure(acc, structId);
   });
 
   const rootItems: Record<string, FinancialReportItem> = {};
