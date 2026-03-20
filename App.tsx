@@ -182,7 +182,7 @@ const App: React.FC = () => {
 
   // Helper for Header Columns in Bilanz/GuV - Updated width logic
   const HeaderColumns = () => (
-      <div className="flex items-center justify-end font-semibold text-gray-500 text-sm mb-2 pr-4 min-w-max">
+      <div className="flex items-center justify-end font-semibold text-gray-500 text-sm mb-2 pr-4 min-w-max print:min-w-0">
           {data?.years.map((year, idx) => (
               <React.Fragment key={year}>
                   <div className="w-32 text-right px-2">{year}</div>
@@ -329,7 +329,7 @@ const App: React.FC = () => {
                   {/* AKTIVA */}
                   <div className="space-y-4 print:mb-8 overflow-hidden">
                     <div className="overflow-x-auto pb-2">
-                        <div className="min-w-max">
+                        <div className="min-w-max print:min-w-0">
                             <div className="flex justify-between items-end border-b pb-2">
                                 <h3 className="text-lg font-bold text-gray-800">AKTIVA</h3>
                                 <HeaderColumns />
@@ -346,9 +346,9 @@ const App: React.FC = () => {
                   </div>
 
                   {/* PASSIVA */}
-                  <div className="space-y-4 print:break-before-page overflow-hidden">
+                  <div className="space-y-4 overflow-hidden print:break-before-page">
                      <div className="overflow-x-auto pb-2">
-                        <div className="min-w-max">
+                        <div className="min-w-max print:min-w-0">
                             <div className="flex justify-between items-end border-b pb-2">
                                 <h3 className="text-lg font-bold text-gray-800">PASSIVA</h3>
                                 <HeaderColumns />
@@ -369,7 +369,7 @@ const App: React.FC = () => {
               {/* GUV VIEW */}
               <div className={(activeTab === 'GUV' ? 'block' : 'hidden print:block print:break-before-page')}>
                 <div className="p-6 w-full print:max-w-none print:p-8 overflow-x-auto">
-                   <div className="min-w-max">
+                   <div className="min-w-max print:min-w-0">
                         <h2 className="hidden print:block text-xl font-bold mb-4">Gewinn- und Verlustrechnung</h2>
 
                         <div className="mb-2">
@@ -384,7 +384,7 @@ const App: React.FC = () => {
                         />
 
                         {/* Jahresergebnis Footer */}
-                        <div className="flex justify-between items-center mt-8 pt-4 border-t-2 border-gray-200 bg-slate-50 p-4 rounded print:bg-transparent print:border-gray-800 min-w-max print:break-inside-avoid">
+                        <div className="flex justify-between items-center mt-8 pt-4 border-t-2 border-gray-200 bg-slate-50 p-4 rounded print:bg-transparent print:border-gray-800 min-w-max print:min-w-0 print:break-inside-avoid">
                             <span className="font-bold text-gray-900 text-lg mr-8">Jahresergebnis</span>
                             <div className="flex gap-8">
                                 {data.years.map(y => (
@@ -402,8 +402,7 @@ const App: React.FC = () => {
               
               {/* KPI VIEW */}
               <div 
-                  className={activeTab === 'KPI' ? 'block' : 'hidden print:block'} 
-                  style={{ pageBreakBefore: 'always' }}
+                  className={activeTab === 'KPI' ? 'block' : 'hidden print:block print:break-before-page'} 
               >
                   <KPIBoard 
                     data={data} 

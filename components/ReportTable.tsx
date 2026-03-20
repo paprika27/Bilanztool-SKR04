@@ -78,24 +78,24 @@ const ReportTable: React.FC<Props> = ({ data, onSelectAccount, root = false, lev
   const paddingLeft = level * 1.5 + 1; // rem
   
   return (
-    <div className="w-full break-inside-avoid min-w-max">
+    <div className="w-full min-w-max print:min-w-0">
       <div 
-        className={`flex items-center py-2 pr-2 cursor-pointerXB transition-colors ${rowClass}`}
+        className={`flex items-start py-2 pr-2 cursor-pointer transition-colors ${rowClass}`}
         onClick={() => setLocalExpanded(!localExpanded)}
       >
         {/* LABEL COLUMN - Sticky left on small screens could be added, but kept simple for now */}
-        <div className="flex-1 flex items-center gap-2 overflow-hidden min-w-[300px]" style={{ paddingLeft: `${paddingLeft}rem` }}>
+        <div className="flex-1 flex items-start gap-2 overflow-hidden min-w-[300px] print:min-w-0" style={{ paddingLeft: `${paddingLeft}rem` }}>
           {hasChildren ? (
-            <span className="text-gray-400 print:hidden flex-shrink-0">
+            <span className="text-gray-400 print:hidden flex-shrink-0 mt-0.5">
               {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </span>
           ) : <span className="w-4 print:hidden flex-shrink-0" />} 
           
-          <span className="truncate" title={data.label}>{data.label}</span>
+          <span className="truncate print:whitespace-normal print:break-words" title={data.label}>{data.label}</span>
         </div>
 
         {/* YEAR COLUMNS */}
-        <div className="flex items-center justify-end flex-shrink-0">
+        <div className="flex items-start justify-end flex-shrink-0 pt-0.5">
           {years.map((year, idx) => {
              const val = data.yearlyAmounts[year] || 0;
              const prevYear = years[idx + 1];
@@ -134,20 +134,20 @@ const ReportTable: React.FC<Props> = ({ data, onSelectAccount, root = false, lev
           {data.accounts?.map((acc) => (
             <div 
               key={acc.accountNumber} 
-              className="flex items-center py-1.5 pr-2 border-l-2 border-transparent hover:bg-blue-50 hover:border-blue-500 cursor-pointer text-sm group print:hover:bg-transparent print:border-l-0"
+              className="flex items-start py-1.5 pr-2 border-l-2 border-transparent hover:bg-blue-50 hover:border-blue-500 cursor-pointer text-sm group print:hover:bg-transparent print:border-l-0"
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectAccount(acc);
               }}
             >
-              <div className="flex-1 flex items-center gap-3 text-gray-600 group-hover:text-blue-700 print:text-gray-600 overflow-hidden min-w-[300px]"
+              <div className="flex-1 flex items-start gap-3 text-gray-600 group-hover:text-blue-700 print:text-gray-600 overflow-hidden min-w-[300px] print:min-w-0"
                    style={{ paddingLeft: `${paddingLeft + 1.5}rem` }}>
-                <List size={12} className="text-gray-300 group-hover:text-blue-400 print:hidden flex-shrink-0" />
-                <span className="font-mono bg-white border border-gray-200 px-1 rounded text-xs text-gray-600 print:border-gray-300">{acc.accountNumber}</span>
-                <span className="truncate">{acc.accountName}</span>
+                <List size={12} className="text-gray-300 group-hover:text-blue-400 print:hidden flex-shrink-0 mt-0.5" />
+                <span className="font-mono bg-white border border-gray-200 px-1 rounded text-xs text-gray-600 print:border-gray-300 mt-0.5">{acc.accountNumber}</span>
+                <span className="truncate print:whitespace-normal print:break-words">{acc.accountName}</span>
               </div>
               
-              <div className="flex items-center justify-end flex-shrink-0">
+              <div className="flex items-start justify-end flex-shrink-0 pt-0.5">
                 {years.map((year, idx) => {
                    const val = acc.yearlyBalances[year] || 0;
                    const prevYear = years[idx + 1];
