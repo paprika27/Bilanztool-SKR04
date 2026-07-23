@@ -26,29 +26,26 @@ export const DynamicTrendIcon = ({ current, prev }: { current: number, prev: num
   const isPositive = diff > 0;
   
   // Color based on Math
-  const colorClass = Math.abs(diff) < 1 
-    ? "bg-gray-300" 
-    : isPositive 
-      ? "bg-green-500" 
-      : "bg-red-500";
+  const bgClass = isPositive ? "bg-green-500" : "bg-red-500";
+  const printTextClass = isPositive ? "print:text-green-600" : "print:text-red-600";
 
   if (Math.abs(diff) < 1) {
       return (
-        <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center" title="Keine Veränderung">
-            <ArrowLeft size={12} className="text-white" />
+        <div className="w-5 h-5 rounded-full bg-gray-200 print:bg-transparent flex items-center justify-center" title="Keine Veränderung">
+            <ArrowLeft size={12} className="text-white print:text-gray-400" />
         </div>
       );
   }
 
   return (
     <div 
-        className={`w-5 h-5 rounded-full ${colorClass} flex items-center justify-center shadow-sm`} 
+        className={`w-5 h-5 rounded-full ${bgClass} print:bg-transparent flex items-center justify-center shadow-sm print:shadow-none`} 
         title={`${isPositive ? '+' : ''}${formatCurrency(diff)} (${percent.toFixed(1)}%)`}
     >
       {isPositive ? (
-          <ArrowUpLeft size={12} className="text-white" />
+          <ArrowUpLeft size={12} className={`text-white ${printTextClass}`} />
       ) : (
-          <ArrowDownLeft size={12} className="text-white" />
+          <ArrowDownLeft size={12} className={`text-white ${printTextClass}`} />
       )}
     </div>
   );

@@ -304,7 +304,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
               const zIndexStyle = { zIndex: isActive ? 50 : 10 };
 
               // Apply transition to content Wrapper DIV, NOT the TD itself.
-              const wrapperClass = `border-b border-gray-100 transition-transform duration-300 ease-in-out bg-white ${opacityClass} relative w-full h-full flex items-center print:border-gray-200`;
+              const baseWrapper = `border-b border-gray-100 transition-transform duration-300 ease-in-out bg-white ${opacityClass} relative w-full print:border-gray-200`;
 
               return (
               <tr 
@@ -315,7 +315,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
               >
                 {/* Drag Handle Column */}
                 <td className="p-0 border-b-0 align-top h-1 print:hidden">
-                    <div className={`${wrapperClass} py-4 px-2 justify-center`} style={{...transformStyle, ...zIndexStyle}}>
+                    <div className={`${baseWrapper} h-full flex items-center py-4 px-2 justify-center`} style={{...transformStyle, ...zIndexStyle}}>
                         <div 
                         draggable
                         onDragStart={(e) => onDragStart(e, index)}
@@ -328,7 +328,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                 </td>
                 
                 <td className="p-0 border-b-0 align-top h-1">
-                   <div className={`${wrapperClass} py-4 pl-2 block`} style={{...transformStyle, ...zIndexStyle}}>
+                   <div className={`${baseWrapper} flex flex-col justify-center py-4 pl-2`} style={{...transformStyle, ...zIndexStyle}}>
                         {/* Interactive Edit View */}
                         <div className="space-y-2 relative w-full print:hidden">
                             <input 
@@ -397,13 +397,13 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                     return (
                         <React.Fragment key={y}>
                             <td className="p-0 border-b-0 align-top h-1">
-                                <div className={`${wrapperClass} py-4 px-2 justify-end font-mono text-base font-medium text-gray-900 tabular-nums`} style={{...transformStyle, ...zIndexStyle}}>
+                                <div className={`${baseWrapper} h-full flex items-center py-4 px-2 justify-end font-mono text-base font-medium text-gray-900 tabular-nums`} style={{...transformStyle, ...zIndexStyle}}>
                                     {formatValue(res, kpi.format)}
                                 </div>
                             </td>
                             {prevRes !== null && (
                                 <td className="p-0 border-b-0 align-top h-1">
-                                    <div className={`${wrapperClass} py-4 px-0 justify-center`} style={{...transformStyle, ...zIndexStyle}}>
+                                    <div className={`${baseWrapper} h-full flex items-center py-4 px-0 justify-center`} style={{...transformStyle, ...zIndexStyle}}>
                                         <DynamicTrendIcon current={res || 0} prev={prevRes || 0} />
                                     </div>
                                 </td>
@@ -412,7 +412,7 @@ const KPIBoard: React.FC<Props> = ({ data, years, kpis, setKpis }) => {
                     );
                 })}
                 <td className="p-0 border-b-0 align-top h-1 print:hidden">
-                    <div className={`${wrapperClass} py-4 px-2 justify-end`} style={{...transformStyle, ...zIndexStyle}}>
+                    <div className={`${baseWrapper} h-full flex items-center py-4 px-2 justify-end`} style={{...transformStyle, ...zIndexStyle}}>
                         <button onClick={() => deleteKPI(kpi.id)} className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-gray-100 transition-colors">
                             <Trash2 size={16} />
                         </button>
